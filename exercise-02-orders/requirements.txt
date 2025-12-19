@@ -1,0 +1,8 @@
+# Temporal SDK
+temporalio==1.7.1
+
+# For async support (if you want to use async activities/workflows)
+aiohttp==3.9.1
+
+# Useful for development/testing
+python-dateutil==2.8.2

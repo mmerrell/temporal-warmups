@@ -1,4 +1,4 @@
-# database.py
+# inventory.py
 # This simulates an external database that activities can access
 import time
 

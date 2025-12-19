@@ -4,7 +4,7 @@
 A simple user registration flow with validation, database creation, and email notifications. The original code runs sequentially with no durability or retry logic.
 
 ## Original Code
-See `original/registration_service.py` - a class-based implementation with:
+See `original/pre-temporal.py` - a class-based implementation with:
 - 4 steps: validate, create user, send welcome email, send verification email
 - Simulated failures (10% database, 15% email)
 - No retry logic

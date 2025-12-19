@@ -16,11 +16,7 @@ async def main():
             client,
             task_queue="user-registration-tasks",
             workflows=[RegistrationWorkflow],
-            activities=[
-                send_welcome_email,
-                send_verification_email,
-                create_user_record,
-            ],
+            activities=[send_welcome_email,send_verification_email,create_user_record],
         )
     except Exception as err:
         print(f"❌ ERROR: {err}", file=sys.stderr, flush=True)
