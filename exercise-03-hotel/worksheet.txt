@@ -1,0 +1,25 @@
+WORKFLOW LOGIC (stays in workflow.py):
+[ ] Calculate nights from check_in/check_out
+[ ] Calculate base price from room_type
+[ ] Apply discount if nights >= 7
+[ ] Validate guest_name (length check)
+[ ] Validate guest_email (contains @)
+[ ] Validate check_in < check_out
+
+ACTIVITIES (goes in activities.py):
+[ ] check_room_availability(room_type, check_in, check_out) → List[Room]
+[ ] process_payment(guest_name, total_price, payment_method) → payment_id
+[ ] assign_room(room_number, guest_name) → room_number
+[ ] send_confirmation_email(guest_email, reservation_id, details) → success
+[ ] refund_payment(payment_id) → success (COMPENSATION!)
+
+EXTERNAL STATE NEEDED:
+[ ] Room inventory database/dict
+[ ] Payment tracking system
+[ ] Email tracking
+
+RETRY POLICIES NEEDED:
+[ ] Payment: 3 attempts (currently has manual retry - remove it!)
+[ ] Room assignment: 3 attempts (currently has NONE - add it!)
+[ ] Email: 3 attempts (currently has basic try/catch - upgrade it!)
+[ ] Refund: 5 attempts (important to succeed!)
