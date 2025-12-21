@@ -1,4 +1,4 @@
-# Temporal Warmups - Learning Curriculum
+# Temporal Warmups - Learning Curriculum (Updated)
 
 ## Overview
 
@@ -7,6 +7,75 @@ A progressive series of hands-on exercises designed to build expertise with Temp
 **Goal:** Complete each exercise in approximately 1 hour, building speed and confidence over time across Python, Java, Go, and TypeScript.
 
 **Brand Color:** `#AEB6D9` (Temporal's primary brand color)
+
+---
+
+## Common Type Serialization Issues (Exercises #1-4)
+
+**CRITICAL:** Temporal's default JSON converter has limitations that affect all beginner exercises.
+
+### What Works Out of the Box:
+- ✅ Strings, integers, floats, booleans
+- ✅ Lists, dicts
+- ✅ Dataclasses (if all fields are serializable types)
+
+### What DOES NOT Work:
+- ❌ Enums (use `str` instead)
+- ❌ datetime/date objects (use `str` in ISO 8601 format)
+- ❌ Decimal types (use `float` instead)
+- ❌ Custom classes (unless dataclass with serializable fields)
+
+### Week 1-4 Strategy: Keep It Simple
+```python
+# ❌ Don't use in dataclasses
+room_type: RoomType  # Enum
+check_in: datetime   # datetime object
+price: Decimal       # Decimal type
+
+# ✅ Use simple types instead
+room_type: str       # "standard", "deluxe", "suite"
+check_in: str        # "2024-12-20" (ISO 8601: YYYY-MM-DD)
+price: float         # 99.99
+```
+
+### Week 5+ Topic: Custom Data Converters
+Once you master the basics, learn to build custom converters for Enums, Decimals, and complex types.
+
+---
+
+## Activity vs Workflow Logic - Decision Framework
+
+When analyzing code for conversion to Temporal, use this framework:
+
+### Should This Be WORKFLOW Logic?
+- ✅ Pure calculations (no I/O)
+- ✅ Conditional logic based on inputs
+- ✅ Data transformations
+- ✅ Input validation
+- ❌ NO external system calls
+- ❌ NO randomness or time-based operations
+
+### Should This Be an ACTIVITY?
+- ✅ Database reads/writes
+- ✅ API calls to external services
+- ✅ File I/O
+- ✅ Email/SMS sending
+- ✅ Anything with `time`, `random`, `datetime.now()`
+- ✅ Anything that can fail due to external factors
+
+### Examples from Exercise #3:
+
+| Code | Location | Why? |
+|------|----------|------|
+| `nights = (check_out - check_in).days` | Workflow | Pure calculation from inputs |
+| `total = base_price * nights` | Workflow | Deterministic arithmetic |
+| `if nights >= 7: total *= 0.9` | Workflow | Deterministic conditional |
+| `if not email or '@' not in email` | Workflow | Input validation |
+| `check_room_availability()` | Activity | Reads external inventory system |
+| `process_payment()` | Activity | Calls external payment gateway |
+| `send_email()` | Activity | External email service (can fail) |
+
+**Rule of thumb:** If you can write it as a pure function with no side effects, it belongs in the workflow.
 
 ---
 
@@ -54,7 +123,7 @@ Focus on learning the basic workflow → activity pattern across multiple langua
 - Python version compatibility (3.9-3.10, NOT 3.14)
 - Temporal's sandbox restrictions
 - Dataclass serialization (use `float` not `Decimal`)
-- `__pycache__` can lie to you
+- `__pycache__` can cache old, broken code
 - How to debug cryptic `os.stat` errors
 
 **Common Pitfalls:**
@@ -91,24 +160,42 @@ Focus on learning the basic workflow → activity pattern across multiple langua
 
 ### Exercise #3: Hotel Reservation ⭐⭐⭐
 **Language:** Python  
-**Time:** ~1.5 hours  
-**Concepts:** Messy code refactoring, first compensations
+**Time:** ~3 hours (includes business logic analysis)  
+**Concepts:** Messy code refactoring, fallback patterns, architectural decisions
 
-**Scenario:** Hotel booking with payment, room assignment, and confirmation (starting from messy 80+ line function).
+**Scenario:** Hotel booking with payment, room assignment, and confirmation (starting from messy 100+ line monolithic function).
 
 **Learning Goals:**
 - Refactor poorly organized code to Temporal patterns
 - Make judgment calls about workflow vs activity boundaries
-- Introduce basic compensation (refund if email fails)
-- Handle inconsistent error patterns in legacy code
+- Implement fallback notification patterns (email → SMS → manual)
+- Understand when NOT to compensate (auxiliary failures vs business-critical)
+- Handle type serialization constraints (Enum → str, datetime → str)
 
 **Key Takeaways:**
 - Breaking apart monolithic functions
 - When calculations should be workflow logic vs activities
-- First exposure to compensation need
-- Dealing with mixed error handling approaches
+- Fallback patterns for non-critical operations
+- When auxiliary failures (email) don't warrant compensation
+- Type serialization: Enum/datetime don't serialize, use strings
+- ISO 8601 date format requirements (zero-padded: `2024-07-12` not `2024-7-12`)
 
-**Status:** 🎯 Next up
+**The "Audit" Benefit:**
+Converting legacy code to Temporal forces architectural clarity. You must answer:
+- What's deterministic vs non-deterministic?
+- What's core business logic vs external dependencies?
+- Where are the failure boundaries?
+- What failures are critical vs auxiliary?
+
+This analysis adds time but provides architectural value beyond just learning Temporal.
+
+**Common Issues:**
+- `TypeError: Object of type RoomTypes is not JSON serializable` → Use `str` instead of Enum
+- `ValueError: Invalid isoformat string: '2025-7-12'` → Use zero-padded dates: `'2025-07-12'`
+- `TypeError: 'LoggerAdapter' object is not callable` → Use `activity.logger.info()` not `activity.logger()`
+- Using `workflow.uuid4()` in client code → Use standard `uuid.uuid4()` instead
+
+**Status:** ✅ Complete
 
 ---
 
@@ -127,6 +214,40 @@ Focus on learning the basic workflow → activity pattern across multiple langua
 **Key Differences to Learn:**
 - **Java:** Interface-based design, activity stubs, builder patterns
 - **Go:** Context everywhere, struct-based workflows, channels
+
+---
+
+## Fallback Patterns (Introduced in Exercise #3)
+
+**Pattern:** Progressive degradation through multiple service channels
+
+**Use Case:** Non-critical operations with multiple backup options
+
+**Example from Exercise #3:**
+```python
+try:
+    # Primary notification channel
+    await workflow.execute_activity(send_email_notification, ...)
+except ActivityError:
+    # Fallback: Try SMS
+    workflow.logger.warning("Email failed, trying SMS")
+    try:
+        await workflow.execute_activity(send_sms_notification, ...)
+    except ActivityError:
+        # Ultimate fallback: Manual intervention
+        workflow.logger.warning("SMS failed, queuing for manual notification")
+        await workflow.execute_activity(front_desk_confirmation, ...)
+```
+
+**Key Insight:** Don't fail the entire workflow for auxiliary failures. Degrade gracefully.
+
+**Contrast with Compensation:**
+- **Fallback:** Try alternative methods for same goal (notify customer via email → SMS → phone)
+- **Compensation:** Rollback previous business steps (refund payment, release inventory)
+
+**When to Use Fallback vs Compensation:**
+- **Fallback:** Notification failures, optional integrations, non-critical features
+- **Compensation:** Payment failures after inventory reserved, booking failures after payment processed
 
 ---
 
@@ -158,7 +279,7 @@ Introduce complexity through realistic business scenarios and advanced Temporal 
 ### Exercise #6: Parallel Execution (Fan-out/Fan-in) ⭐⭐⭐⭐
 **Language:** Python  
 **Time:** ~2 hours  
-**Concepts:** Concurrent activities, partial failures
+**Concepts:** Concurrent activities, partial failures, claim check pattern
 
 **Scenario:** Process batch of orders simultaneously, aggregate results, handle partial failures.
 
@@ -167,6 +288,7 @@ Introduce complexity through realistic business scenarios and advanced Temporal 
 - Wait for all/any to complete
 - Handle scenario where 2 of 5 parallel activities fail
 - Aggregate results from concurrent execution
+- **NEW:** Introduce claim check pattern for large datasets
 
 **Key Patterns:**
 - `asyncio.gather()` in Python
@@ -174,6 +296,7 @@ Introduce complexity through realistic business scenarios and advanced Temporal 
 - `workflow.Go()` in Go
 - Cancellation scopes for cleanup
 - Partial success handling
+- Claim check for 10,000+ record datasets
 
 ---
 
@@ -286,24 +409,36 @@ Focus on debugging, optimization, versioning, and handling complex real-world sc
 
 ---
 
-### Exercise #11: Workflow Versioning ⭐⭐⭐⭐
+### Exercise #11: Workflow & Worker Versioning ⭐⭐⭐⭐
 **Language:** Python  
 **Time:** ~2 hours  
 **Concepts:** Safe deployments, backwards compatibility
 
 **Scenario:** Production workflow needs a new activity added in the middle. Must support both old (in-flight) and new workflows.
 
+**Part A: Workflow Versioning**
+- Use `workflow.patch()` for code evolution
+- Support in-flight workflows during deployments
+
+**Part B: Worker Versioning (NEW)**
+- Deploy versioned workers side-by-side
+- Use Worker Build IDs and Version Sets
+- Route workflows to correct worker versions
+- Safely migrate workflows to new versions
+
 **Learning Goals:**
 - Use `workflow.patch()` for versioning
 - Deploy changes without breaking in-flight workflows
 - Understand determinism implications
 - Test version compatibility
+- Implement zero-downtime deployments
 
 **Key Patterns:**
 - Patching workflows
 - Version markers
 - Safe rollout strategies
 - Testing multiple versions
+- Worker Build ID management
 
 ---
 
@@ -349,6 +484,43 @@ Focus on debugging, optimization, versioning, and handling complex real-world sc
 - Proper error handling
 - Retry strategies
 - Timeout tuning
+
+---
+
+### Exercise #14: Worker Optimization & Performance Tuning ⭐⭐⭐⭐⭐
+**Language:** Python  
+**Time:** 2-3 hours  
+**Concepts:** Performance, timeouts, parallelization, worker configuration, resource management
+
+**Scenario:** Production workflow that "works" but takes 5 minutes when it should take 30 seconds, times out randomly, and can't handle load.
+
+**Problems to Diagnose & Fix:**
+- Timeout misconfigurations (too short, too long, wrong hierarchy)
+- Serial execution when should be parallel
+- Worker configuration issues (too few/many concurrent tasks)
+- Activity design problems (mega-activities blocking workers)
+- Resource starvation (database connection exhaustion)
+- No graceful degradation
+
+**Learning Goals:**
+- Understand timeout hierarchy (schedule-to-start, start-to-close, schedule-to-close)
+- Activity heartbeats for long-running operations
+- Parallelization strategies
+- Worker configuration tuning
+- Resource management (connection pooling, rate limiting)
+- Monitoring & metrics
+- **Claim check pattern for large payloads** (performance optimization)
+
+**Performance Scenarios:**
+- **The Slow Workflow:** 5 minutes → 30 seconds
+- **The Overwhelmed Worker:** Crashes at 10 concurrent → handles 100+
+- **The Timeout Spiral:** 30% timeout rate → <1%
+- **The Database Bottleneck:** Connection pool exhausted → stable under 200 concurrent
+
+**Claim Check Pattern:**
+- Reduce workflow history: 50MB → 500KB
+- Improve replay time: 10s → <1s
+- Lower worker memory: 2GB → 200MB
 
 ---
 
@@ -423,6 +595,30 @@ Focus on debugging, optimization, versioning, and handling complex real-world sc
 
 ---
 
+## Common Mistakes (Updated)
+
+1. **Importing `time`, `random`, `datetime.now()` in workflow.py**
+2. **Forgetting `await` on activity calls**
+3. **Passing mutable workflow state to activities**
+4. **Activity functions with `self` parameter** (they're not methods)
+5. **Missing activities in worker registration**
+6. **Using `time.sleep()` instead of `await asyncio.sleep()`** in async activities
+7. **Accessing dict keys on dataclass objects** (`item['sku']` vs `item.sku`)
+8. **Using Enums/datetime in dataclasses** without custom data converter
+   - Error: `TypeError: Object of type RoomType is not JSON serializable`
+   - Fix: Use `str` for now, custom converter in Week 5+
+9. **Non-zero-padded ISO dates**
+   - Error: `ValueError: Invalid isoformat string: '2025-7-12'`
+   - Fix: Use `'2025-07-12'` (zero-padded month/day: YYYY-MM-DD)
+10. **Calling `activity.logger()` as function**
+    - Error: `TypeError: 'LoggerAdapter' object is not callable`
+    - Fix: `activity.logger.info()` not `activity.logger()`
+11. **Using `workflow.uuid4()` in client code**
+    - Error: `AttributeError` or context errors
+    - Fix: Use standard `uuid.uuid4()` in client, `workflow.uuid4()` only in workflows
+
+---
+
 ## Workshop Application
 
 These exercises form the foundation for two workshop tracks:
@@ -431,7 +627,7 @@ These exercises form the foundation for two workshop tracks:
 **Session 1:** Foundations (Exercise #1 concepts)  
 **Session 2:** Handling Failure (Exercise #2 concepts + light compensations)  
 **Session 3:** Advanced Orchestration (Exercise #6 - parallel execution)  
-**Session 4:** Production Patterns (Signals/Queries + versioning basics)
+**Session 4:** Production Patterns (Signals/Queries + versioning basics + claim check)
 
 ### Advanced Workshop (6 hours)
 **Session 1:** Deep Dive on Workflow Design (Best practices, anti-patterns)  
@@ -453,6 +649,8 @@ These exercises form the foundation for two workshop tracks:
 - ✅ Recognizes anti-patterns in code review
 - ✅ Debugs Temporal errors systematically
 - ✅ Implements compensations correctly
+- ✅ Understands type serialization constraints
+- ✅ Knows when to use fallback vs compensation patterns
 - ✅ Comfortable across Python, Java, Go
 - ✅ Ready to design production workflows
 
@@ -477,6 +675,8 @@ These exercises form the foundation for two workshop tracks:
 - Use Python 3.9-3.10 (NOT 3.14)
 - Delete `__pycache__` when debugging
 - Use `float` for money (or implement custom converter)
+- Use `str` for dates in ISO 8601 format (YYYY-MM-DD)
+- Use `str` for enums (or implement custom converter)
 - Never import `time`, `random`, `datetime.now()` in workflows
 - Always wrap activity imports in `unsafe.imports_passed_through()`
 - Keep workflow logic deterministic
@@ -485,5 +685,5 @@ These exercises form the foundation for two workshop tracks:
 ---
 
 **Status:** Active Development (December 2024 - January 2025)  
-**Current Progress:** Exercises #1, #2, #2.5 Complete  
-**Next Up:** Exercise #3 (Hotel Reservation)
+**Current Progress:** Exercises #1, #2, #2.5, #3 Complete  
+**Next Up:** Multi-language rotation or Exercise #4-5
