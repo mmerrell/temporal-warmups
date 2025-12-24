@@ -1,0 +1,487 @@
+{
+  "airports": [
+    {"code": "SFO", "name": "San Francisco International", "city": "San Francisco"},
+    {"code": "LAX", "name": "Los Angeles International", "city": "Los Angeles"},
+    {"code": "JFK", "name": "John F. Kennedy International", "city": "New York"},
+    {"code": "ORD", "name": "O'Hare International", "city": "Chicago"},
+    {"code": "MIA", "name": "Miami International", "city": "Miami"},
+    {"code": "DFW", "name": "Dallas/Fort Worth International", "city": "Dallas"},
+    {"code": "SEA", "name": "Seattle-Tacoma International", "city": "Seattle"},
+    {"code": "BOS", "name": "Boston Logan International", "city": "Boston"},
+    {"code": "ATL", "name": "Hartsfield-Jackson Atlanta International", "city": "Atlanta"},
+    {"code": "DEN", "name": "Denver International", "city": "Denver"},
+    {"code": "LAS", "name": "Harry Reid International", "city": "Las Vegas"},
+    {"code": "PHX", "name": "Phoenix Sky Harbor International", "city": "Phoenix"}
+  ],
+
+  "flights": [
+    {
+      "flight_number": "AA1234",
+      "airline": "American Airlines",
+      "departure_airport": "SFO",
+      "arrival_airport": "JFK",
+      "departure_time": "08:00:00",
+      "arrival_time": "16:30:00",
+      "base_prices": {
+        "first": 850.00,
+        "business": 550.00,
+        "economy": 280.00
+      },
+      "airplane": "Boeing 777-300"
+    },
+    {
+      "flight_number": "AA5678",
+      "airline": "American Airlines",
+      "departure_airport": "LAX",
+      "arrival_airport": "MIA",
+      "departure_time": "09:15:00",
+      "arrival_time": "17:00:00",
+      "base_prices": {
+        "first": 780.00,
+        "business": 480.00,
+        "economy": 250.00
+      },
+      "airplane": "Airbus A321"
+    },
+    {
+      "flight_number": "DL2468",
+      "airline": "Delta",
+      "departure_airport": "SEA",
+      "arrival_airport": "ATL",
+      "departure_time": "07:30:00",
+      "arrival_time": "15:45:00",
+      "base_prices": {
+        "first": 920.00,
+        "business": 590.00,
+        "economy": 310.00
+      },
+      "airplane": "Boeing 767-400"
+    },
+    {
+      "flight_number": "DL3579",
+      "airline": "Delta",
+      "departure_airport": "BOS",
+      "arrival_airport": "LAX",
+      "departure_time": "10:00:00",
+      "arrival_time": "13:30:00",
+      "base_prices": {
+        "first": 890.00,
+        "business": 560.00,
+        "economy": 295.00
+      },
+      "airplane": "Airbus A350-900"
+    },
+    {
+      "flight_number": "UA9876",
+      "airline": "United",
+      "departure_airport": "ORD",
+      "arrival_airport": "DEN",
+      "departure_time": "11:20:00",
+      "arrival_time": "13:15:00",
+      "base_prices": {
+        "first": 520.00,
+        "business": 340.00,
+        "economy": 180.00
+      },
+      "airplane": "Boeing 737-900"
+    },
+    {
+      "flight_number": "UA5432",
+      "airline": "United",
+      "departure_airport": "SFO",
+      "arrival_airport": "ORD",
+      "departure_time": "06:45:00",
+      "arrival_time": "12:50:00",
+      "base_prices": {
+        "first": 780.00,
+        "business": 490.00,
+        "economy": 260.00
+      },
+      "airplane": "Boeing 787-9"
+    },
+    {
+      "flight_number": "WN1111",
+      "airline": "Southwest",
+      "departure_airport": "DFW",
+      "arrival_airport": "LAS",
+      "departure_time": "14:00:00",
+      "arrival_time": "15:20:00",
+      "base_prices": {
+        "economy": 150.00
+      },
+      "airplane": "Boeing 737-800"
+    },
+    {
+      "flight_number": "WN2222",
+      "airline": "Southwest",
+      "departure_airport": "PHX",
+      "arrival_airport": "SEA",
+      "departure_time": "08:30:00",
+      "arrival_time": "11:15:00",
+      "base_prices": {
+        "economy": 180.00
+      },
+      "airplane": "Boeing 737-MAX 8"
+    },
+    {
+      "flight_number": "AA7890",
+      "airline": "American Airlines",
+      "departure_airport": "JFK",
+      "arrival_airport": "SFO",
+      "departure_time": "18:00:00",
+      "arrival_time": "21:30:00",
+      "base_prices": {
+        "first": 890.00,
+        "business": 570.00,
+        "economy": 300.00
+      },
+      "airplane": "Airbus A321neo"
+    },
+    {
+      "flight_number": "DL4680",
+      "airline": "Delta",
+      "departure_airport": "ATL",
+      "arrival_airport": "MIA",
+      "departure_time": "12:15:00",
+      "arrival_time": "14:30:00",
+      "base_prices": {
+        "first": 480.00,
+        "business": 310.00,
+        "economy": 165.00
+      },
+      "airplane": "Boeing 717-200"
+    },
+    {
+      "flight_number": "UA6543",
+      "airline": "United",
+      "departure_airport": "DEN",
+      "arrival_airport": "BOS",
+      "departure_time": "16:00:00",
+      "arrival_time": "22:10:00",
+      "base_prices": {
+        "first": 820.00,
+        "business": 520.00,
+        "economy": 275.00
+      },
+      "airplane": "Boeing 757-300"
+    },
+    {
+      "flight_number": "WN3333",
+      "airline": "Southwest",
+      "departure_airport": "LAS",
+      "arrival_airport": "DFW",
+      "departure_time": "17:30:00",
+      "arrival_time": "21:45:00",
+      "base_prices": {
+        "economy": 160.00
+      },
+      "airplane": "Boeing 737-700"
+    }
+  ],
+
+  "airplane_seat_configs": {
+    "Boeing 777-300": {
+      "first": 8,
+      "business": 52,
+      "economy": 280
+    },
+    "Airbus A321": {
+      "first": 0,
+      "business": 20,
+      "economy": 170
+    },
+    "Boeing 767-400": {
+      "first": 6,
+      "business": 35,
+      "economy": 215
+    },
+    "Airbus A350-900": {
+      "first": 12,
+      "business": 48,
+      "economy": 224
+    },
+    "Boeing 737-900": {
+      "first": 0,
+      "business": 16,
+      "economy": 152
+    },
+    "Boeing 787-9": {
+      "first": 8,
+      "business": 48,
+      "economy": 190
+    },
+    "Boeing 737-800": {
+      "economy": 175
+    },
+    "Boeing 737-MAX 8": {
+      "economy": 172
+    },
+    "Airbus A321neo": {
+      "first": 0,
+      "business": 20,
+      "economy": 165
+    },
+    "Boeing 717-200": {
+      "first": 0,
+      "business": 12,
+      "economy": 106
+    },
+    "Boeing 757-300": {
+      "first": 0,
+      "business": 24,
+      "economy": 200
+    },
+    "Boeing 737-700": {
+      "economy": 143
+    }
+  },
+
+  "hotels": [
+    {
+      "hotel_id": "H001",
+      "hotel_name": "Grand Plaza Hotel San Francisco",
+      "city": "San Francisco",
+      "airport_code": "SFO",
+      "rooms": [
+        {"room_number": "101", "room_type": "standard"},
+        {"room_number": "102", "room_type": "standard"},
+        {"room_number": "103", "room_type": "standard"},
+        {"room_number": "104", "room_type": "standard"},
+        {"room_number": "105", "room_type": "standard"},
+        {"room_number": "201", "room_type": "deluxe"},
+        {"room_number": "202", "room_type": "deluxe"},
+        {"room_number": "203", "room_type": "deluxe"},
+        {"room_number": "301", "room_type": "suite"},
+        {"room_number": "302", "room_type": "suite"}
+      ],
+      "rates": {
+        "standard": 189.00,
+        "deluxe": 259.00,
+        "suite": 449.00
+      }
+    },
+    {
+      "hotel_id": "H002",
+      "hotel_name": "Skyline Inn New York",
+      "city": "New York",
+      "airport_code": "JFK",
+      "rooms": [
+        {"room_number": "101", "room_type": "standard"},
+        {"room_number": "102", "room_type": "standard"},
+        {"room_number": "103", "room_type": "standard"},
+        {"room_number": "104", "room_type": "standard"},
+        {"room_number": "201", "room_type": "deluxe"},
+        {"room_number": "202", "room_type": "deluxe"},
+        {"room_number": "203", "room_type": "deluxe"},
+        {"room_number": "301", "room_type": "suite"},
+        {"room_number": "302", "room_type": "suite"}
+      ],
+      "rates": {
+        "standard": 229.00,
+        "deluxe": 319.00,
+        "suite": 589.00
+      }
+    },
+    {
+      "hotel_id": "H003",
+      "hotel_name": "Oceanview Resort Miami",
+      "city": "Miami",
+      "airport_code": "MIA",
+      "rooms": [
+        {"room_number": "101", "room_type": "standard"},
+        {"room_number": "102", "room_type": "standard"},
+        {"room_number": "103", "room_type": "standard"},
+        {"room_number": "201", "room_type": "deluxe"},
+        {"room_number": "202", "room_type": "deluxe"},
+        {"room_number": "301", "room_type": "suite"}
+      ],
+      "rates": {
+        "standard": 199.00,
+        "deluxe": 279.00,
+        "suite": 499.00
+      }
+    },
+    {
+      "hotel_id": "H004",
+      "hotel_name": "Downtown Chicago Suites",
+      "city": "Chicago",
+      "airport_code": "ORD",
+      "rooms": [
+        {"room_number": "101", "room_type": "standard"},
+        {"room_number": "102", "room_type": "standard"},
+        {"room_number": "103", "room_type": "standard"},
+        {"room_number": "104", "room_type": "standard"},
+        {"room_number": "201", "room_type": "deluxe"},
+        {"room_number": "202", "room_type": "deluxe"},
+        {"room_number": "301", "room_type": "suite"}
+      ],
+      "rates": {
+        "standard": 169.00,
+        "deluxe": 239.00,
+        "suite": 429.00
+      }
+    },
+    {
+      "hotel_id": "H005",
+      "hotel_name": "Seattle Waterfront Hotel",
+      "city": "Seattle",
+      "airport_code": "SEA",
+      "rooms": [
+        {"room_number": "101", "room_type": "standard"},
+        {"room_number": "102", "room_type": "standard"},
+        {"room_number": "103", "room_type": "standard"},
+        {"room_number": "201", "room_type": "deluxe"},
+        {"room_number": "202", "room_type": "deluxe"},
+        {"room_number": "301", "room_type": "suite"}
+      ],
+      "rates": {
+        "standard": 179.00,
+        "deluxe": 249.00,
+        "suite": 459.00
+      }
+    },
+    {
+      "hotel_id": "H006",
+      "hotel_name": "Boston Harbor Inn",
+      "city": "Boston",
+      "airport_code": "BOS",
+      "rooms": [
+        {"room_number": "101", "room_type": "standard"},
+        {"room_number": "102", "room_type": "standard"},
+        {"room_number": "201", "room_type": "deluxe"},
+        {"room_number": "202", "room_type": "deluxe"},
+        {"room_number": "301", "room_type": "suite"}
+      ],
+      "rates": {
+        "standard": 199.00,
+        "deluxe": 279.00,
+        "suite": 499.00
+      }
+    },
+    {
+      "hotel_id": "H007",
+      "hotel_name": "Atlanta Peachtree Plaza",
+      "city": "Atlanta",
+      "airport_code": "ATL",
+      "rooms": [
+        {"room_number": "101", "room_type": "standard"},
+        {"room_number": "102", "room_type": "standard"},
+        {"room_number": "103", "room_type": "standard"},
+        {"room_number": "201", "room_type": "deluxe"},
+        {"room_number": "202", "room_type": "deluxe"},
+        {"room_number": "301", "room_type": "suite"}
+      ],
+      "rates": {
+        "standard": 159.00,
+        "deluxe": 229.00,
+        "suite": 399.00
+      }
+    },
+    {
+      "hotel_id": "H008",
+      "hotel_name": "Vegas Strip Grand",
+      "city": "Las Vegas",
+      "airport_code": "LAS",
+      "rooms": [
+        {"room_number": "101", "room_type": "standard"},
+        {"room_number": "102", "room_type": "standard"},
+        {"room_number": "103", "room_type": "standard"},
+        {"room_number": "104", "room_type": "standard"},
+        {"room_number": "105", "room_type": "standard"},
+        {"room_number": "201", "room_type": "deluxe"},
+        {"room_number": "202", "room_type": "deluxe"},
+        {"room_number": "203", "room_type": "deluxe"},
+        {"room_number": "301", "room_type": "suite"},
+        {"room_number": "302", "room_type": "suite"},
+        {"room_number": "303", "room_type": "suite"}
+      ],
+      "rates": {
+        "standard": 129.00,
+        "deluxe": 199.00,
+        "suite": 379.00
+      }
+    }
+  ],
+
+  "car_types": [
+    {
+      "type_name": "economy",
+      "daily_rate": 45.00,
+      "make": "Toyota",
+      "model": "Corolla"
+    },
+    {
+      "type_name": "compact",
+      "daily_rate": 52.00,
+      "make": "Honda",
+      "model": "Civic"
+    },
+    {
+      "type_name": "midsize",
+      "daily_rate": 62.00,
+      "make": "Toyota",
+      "model": "Camry"
+    },
+    {
+      "type_name": "fullsize",
+      "daily_rate": 72.00,
+      "make": "Chevrolet",
+      "model": "Malibu"
+    },
+    {
+      "type_name": "suv",
+      "daily_rate": 89.00,
+      "make": "Ford",
+      "model": "Explorer"
+    },
+    {
+      "type_name": "luxury",
+      "daily_rate": 125.00,
+      "make": "BMW",
+      "model": "5 Series"
+    }
+  ],
+
+  "car_inventory": [
+    {"license_plate": "7ABC123", "car_type": "economy", "location": "SFO"},
+    {"license_plate": "7DEF456", "car_type": "economy", "location": "SFO"},
+    {"license_plate": "7GHI789", "car_type": "compact", "location": "SFO"},
+    {"license_plate": "7JKL012", "car_type": "midsize", "location": "SFO"},
+    {"license_plate": "7MNO345", "car_type": "suv", "location": "SFO"},
+
+    {"license_plate": "3ABC123", "car_type": "economy", "location": "JFK"},
+    {"license_plate": "3DEF456", "car_type": "compact", "location": "JFK"},
+    {"license_plate": "3GHI789", "car_type": "midsize", "location": "JFK"},
+    {"license_plate": "3JKL012", "car_type": "fullsize", "location": "JFK"},
+    {"license_plate": "3MNO345", "car_type": "luxury", "location": "JFK"},
+
+    {"license_plate": "5ABC123", "car_type": "economy", "location": "LAX"},
+    {"license_plate": "5DEF456", "car_type": "compact", "location": "LAX"},
+    {"license_plate": "5GHI789", "car_type": "midsize", "location": "LAX"},
+    {"license_plate": "5JKL012", "car_type": "suv", "location": "LAX"},
+
+    {"license_plate": "4ABC123", "car_type": "economy", "location": "MIA"},
+    {"license_plate": "4DEF456", "car_type": "compact", "location": "MIA"},
+    {"license_plate": "4GHI789", "car_type": "midsize", "location": "MIA"},
+
+    {"license_plate": "6ABC123", "car_type": "economy", "location": "ORD"},
+    {"license_plate": "6DEF456", "car_type": "compact", "location": "ORD"},
+    {"license_plate": "6GHI789", "car_type": "suv", "location": "ORD"},
+
+    {"license_plate": "2ABC123", "car_type": "economy", "location": "SEA"},
+    {"license_plate": "2DEF456", "car_type": "midsize", "location": "SEA"},
+    {"license_plate": "2GHI789", "car_type": "suv", "location": "SEA"},
+
+    {"license_plate": "1ABC123", "car_type": "economy", "location": "BOS"},
+    {"license_plate": "1DEF456", "car_type": "compact", "location": "BOS"},
+    {"license_plate": "1GHI789", "car_type": "midsize", "location": "BOS"},
+
+    {"license_plate": "8ABC123", "car_type": "economy", "location": "ATL"},
+    {"license_plate": "8DEF456", "car_type": "compact", "location": "ATL"},
+    {"license_plate": "8GHI789", "car_type": "suv", "location": "ATL"},
+
+    {"license_plate": "9ABC123", "car_type": "economy", "location": "LAS"},
+    {"license_plate": "9DEF456", "car_type": "luxury", "location": "LAS"},
+    {"license_plate": "9GHI789", "car_type": "suv", "location": "LAS"}
+  ]
+}

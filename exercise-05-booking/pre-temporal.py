@@ -3,10 +3,9 @@
 
 import time
 import random
-from datetime import datetime, timedelta
+from datetime import datetime
 from dataclasses import dataclass
-from typing import Optional, Dict, List
-
+from typing import Dict, List
 
 @dataclass
 class TravelBooking:
@@ -19,7 +18,6 @@ class TravelBooking:
     return_date: str
     num_passengers: int
 
-
 @dataclass
 class FlightReservation:
     confirmation_code: str
@@ -28,7 +26,6 @@ class FlightReservation:
     price: float
     departure: str
     arrival: str
-
 
 @dataclass
 class HotelReservation:
@@ -39,7 +36,6 @@ class HotelReservation:
     check_in: str
     check_out: str
 
-
 @dataclass
 class CarReservation:
     confirmation_code: str
@@ -48,7 +44,6 @@ class CarReservation:
     price: float
     pickup_date: str
     return_date: str
-
 
 class TravelBookingSystem:
     def __init__(self):
@@ -185,7 +180,7 @@ class TravelBookingSystem:
             print("\nStep 5: Sending confirmation email...")
             time.sleep(0.3)
 
-            # Email can fail but we don't care - booking is complete
+            # Email can fail, but we don't care - booking is complete
             if random.random() < 0.10:
                 print("⚠ Warning: Email service failed, but booking is complete")
             else:
@@ -209,12 +204,12 @@ class TravelBookingSystem:
                 'total_price': total_price
             }
 
-        except Exception as e:
+        except Exception as ex:
             # ========================================
             # CRITICAL PROBLEM: INCOMPLETE ROLLBACK!
             # ========================================
             print(f"\n{'=' * 70}")
-            print(f"✗ BOOKING FAILED: {e}")
+            print(f"✗ BOOKING FAILED: {ex}")
             print(f"{'=' * 70}")
 
             # This is the WRONG way to handle it!
@@ -238,7 +233,7 @@ class TravelBookingSystem:
 
             return {
                 'success': False,
-                'error': str(e),
+                'error': str(ex),
                 'partial_bookings': {
                     'flight': flight_confirmation,
                     'hotel': hotel_confirmation,
@@ -296,9 +291,9 @@ if __name__ == "__main__":
     ]
 
     # Process bookings
-    for booking in bookings:
+    for booking_record in bookings:
         try:
-            result = system.book_travel_package(booking)
+            result = system.book_travel_package(booking_record)
             time.sleep(2)  # Pause between bookings
         except Exception as e:
             print(f"Unexpected error: {e}")

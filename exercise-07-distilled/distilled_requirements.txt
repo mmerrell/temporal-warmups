@@ -1,0 +1,11 @@
+# Distilled - Python Implementation Requirements
+
+# Core dependencies (none required for basic version!)
+# This implementation uses only Python standard library
+
+# Optional: For Temporal conversion
+# temporalio>=1.5.0
+
+# Optional: For testing
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0
