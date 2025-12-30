@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static java.lang.Thread.sleep;
 
 public class EmailService {
-    public boolean sendWelcomeEmail(String email, String username) throws InterruptedException {
+    public void sendWelcomeEmail(String email, String username) throws InterruptedException {
         System.out.println("Sending welcome email to " + email + "...");
         sleep(800);  // Simulate email sending (0.8s to match Python)
 
@@ -17,7 +17,6 @@ public class EmailService {
         AtomicInteger emailSentCount = new AtomicInteger();
         emailSentCount.getAndIncrement();
         System.out.println("✓ Welcome email sent (total sent: " + emailSentCount + ")");
-        return true;
     }
 
     public String sendVerificationEmail(String email, String userId) throws InterruptedException {

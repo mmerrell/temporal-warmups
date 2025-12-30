@@ -1,3 +1,4 @@
+import domain.RegistrationResult;
 import domain.User;
 
 import java.util.HashMap;

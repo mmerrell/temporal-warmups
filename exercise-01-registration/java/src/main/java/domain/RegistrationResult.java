@@ -4,12 +4,12 @@ package domain;
  * Result object for registration operation
  */
 public class RegistrationResult {
-    boolean success;
+    public boolean success;
     public String userId;
-    String verificationToken;
+    public String verificationToken;
     String error;
 
-    RegistrationResult(boolean success, String userId, String verificationToken, String error) {
+    public RegistrationResult(boolean success, String userId, String verificationToken, String error) {
         this.success = success;
         this.userId = userId;
         this.verificationToken = verificationToken;
