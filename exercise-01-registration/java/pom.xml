@@ -17,6 +17,31 @@
         <maven.compiler.target>11</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
+    <dependencies>
+        <!--
+          Temporal dependencies needed to compile, build,
+          test, and run Temporal's Java SDK
+        -->
+
+        <!--
+          SDK
+        -->
+        <dependency>
+            <groupId>io.temporal</groupId>
+            <artifactId>temporal-sdk</artifactId>
+            <version>1.24.1</version>
+        </dependency>
+
+        <dependency>
+            <!--
+              Testing
+            -->
+            <groupId>io.temporal</groupId>
+            <artifactId>temporal-testing</artifactId>
+            <version>1.24.1</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 
     <build>
         <plugins>

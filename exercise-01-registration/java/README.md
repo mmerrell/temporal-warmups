@@ -80,3 +80,111 @@ Temporal solves all of these problems!
 ============================================================
 
 ```
+
+## Breaking down the problem
+
+1. Separate Concerns: Workflow vs Activities
+
+Current state: Everything is in one monolithic class.
+
+Goal: Split into two categories:
+- Activities (non-deterministic operations that can fail):
+    - validateUserData() - even validation might call external services
+    - createUserRecord() - database writes
+    - sendWelcomeEmail() - external email API
+    - sendVerificationEmail() - external email API
+- Workflow (deterministic orchestration):
+    - Calls activities in sequence
+    - Handles the overall registration flow
+    - Makes decisions based on activity results
+
+Why: Temporal can retry activities independently. If email fails, it doesn't re-run database creation. The workflow is the durable "memory" of where you are in the process.
+
+2. Create Activity Interface and Implementation
+
+What: Define a Java interface (e.g., RegistrationActivities) with methods for each activity, then create an implementation class.
+
+Why: Temporal uses interfaces for type-safe activity invocation. The interface defines the contract, the implementation contains the actual logic (database calls, API calls, etc.).
+
+3. Create Workflow Interface and Implementation
+
+What: Define a workflow interface (e.g., RegistrationWorkflow) with a single method (the workflow entry point), then implement the orchestration logic.
+
+Key differences from current code:
+- No direct method calls - use Activity stubs
+- Pass activity options (timeouts, retry policies) when invoking
+- Workflow code must be deterministic (no Random, System.currentTimeMillis() directly in workflow)
+
+Why: The workflow becomes the durable orchestration layer. If the worker crashes, Temporal replays the workflow from history and resumes from where it left off.
+
+4. Create the Worker
+
+What: A separate class with a main() method that:
+- Connects to Temporal server
+- Registers your workflow and activity implementations
+- Listens on a task queue (e.g., "registration-queue")
+- Runs forever, processing tasks
+
+Why: Workers are the execution engines. They must be running for workflows to execute. You can have multiple workers for horizontal scaling.
+
+5. Create the Client (Starter)
+
+What: A separate class that:
+- Connects to Temporal server
+- Creates a workflow stub
+- Starts workflow executions with input data
+- Can retrieve results
+
+Why: This is your entry point - how you trigger registrations. The client can be a web server, CLI tool, or anything that needs to start a registration workflow.
+
+6. Configure Retry Policies and Timeouts
+
+What: When calling activities from the workflow, specify:
+- startToCloseTimeout - max time for one activity attempt
+- RetryPolicy - how many retries, backoff strategy, which exceptions to retry
+
+Why: This is where Temporal's magic happens. Email failures? Automatic retries with exponential backoff. Database timeout? Retry up to N times. No manual retry logic needed.
+
+7. Handle Data Serialization
+
+What: Create simple data classes (POJOs) for workflow inputs/outputs:
+- RegistrationRequest (email, username, password)
+- RegistrationResult (success, userId, token, error)
+
+Why: Temporal serializes data to JSON. Keep it simple - strings, numbers, basic types. Avoid enums unless you have custom serialization.
+
+8. Project Structure
+
+Reorganize into:
+src/main/java/
+├── workflows/
+│   ├── RegistrationWorkflow.java (interface)
+│   └── RegistrationWorkflowImpl.java
+├── activities/
+│   ├── RegistrationActivities.java (interface)
+│   └── RegistrationActivitiesImpl.java
+├── model/
+│   ├── RegistrationRequest.java
+│   └── RegistrationResult.java
+├── Worker.java
+└── Client.java
+
+Why: Clear separation of concerns. Easy to test, maintain, and understand.
+
+Key Mental Model Shift
+
+Before: "If this fails, the whole thing fails. Start over."
+
+After: "Each step is durable. If email fails, Temporal retries just that step. If the process crashes, Temporal resumes from the last completed activity."
+
+The workflow becomes a state machine that Temporal manages. You write the business logic; Temporal handles durability, retries, and visibility.
+
+What You'll Observe
+
+- Run the worker, then run the client - registration starts
+- Kill the worker mid-execution - workflow pauses
+- Restart worker - workflow resumes exactly where it left off
+- Go to Temporal UI (http://localhost:8233) - see the entire execution history
+
+This is the power of durable execution: your business logic survives process crashes, network failures, and transient errors.
+
