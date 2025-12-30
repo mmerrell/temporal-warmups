@@ -1,8 +1,10 @@
 # database.py - Updated with fixes and Airport class
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 from temporalio.exceptions import ApplicationError
+
 
 @dataclass
 class Airport:
@@ -10,9 +12,10 @@ class Airport:
     name: str
     city: str
 
+
 @dataclass
 class TravelBookingRequest:
-    confirmation_code: str # System generated
+    confirmation_code: str  # System generated
     customer_name: str
     customer_email: str
     departure_city: str
@@ -22,6 +25,9 @@ class TravelBookingRequest:
     return_date: str
     num_passengers: int
     airline: Optional[str] = ""
+    room_type: str = "standard"
+    car_type: str = "economy"
+
 
 # Flight template - flies this route every day
 @dataclass
@@ -34,6 +40,7 @@ class Flight:
     departure_airport: str
     arrival_airport: str
 
+
 @dataclass
 class SeatInstance:
     """A specific seat on a specific flight instance"""
@@ -41,6 +48,7 @@ class SeatInstance:
     carriage_class: str
     date: str
     is_available: bool
+
 
 @dataclass
 class FlightInstance:
@@ -50,15 +58,16 @@ class FlightInstance:
     seats: List[SeatInstance]
     airplane: str
 
+
 @dataclass
 class FlightReservationRequest:
     confirmation_code: str
     carriage_class: str
     departure_date: str
-    departure_time: str
     departure_city: str
     destination_city: str
     airline: Optional[str] = ""
+
 
 @dataclass
 class CompletedFlightReservation:
@@ -73,6 +82,7 @@ class CompletedFlightReservation:
     price: float
     booked_at: str  # timestamp
 
+
 @dataclass
 class Room:
     room_number: str
@@ -81,7 +91,6 @@ class Room:
 
     def is_available(self, dates: List[str]) -> bool:
         """Check if room is available for all requested dates"""
-        # More Pythonic with any()
         return not any(date in self.unavailable_dates for date in dates)
 
     def book_dates(self, dates: List[str]):
@@ -89,6 +98,7 @@ class Room:
         for date in dates:
             if date not in self.unavailable_dates:
                 self.unavailable_dates.append(date)
+
 
 @dataclass
 class Hotel:
@@ -141,52 +151,15 @@ class Hotel:
         return room.room_number
 
 
-# Add to BookingDatabase
-
-def find_available_hotel_room(
-        self,
-        city: str,
-        room_type: str,
-        check_in: str,
-        check_out: str
-) -> Optional[tuple[Hotel, Room]]:
-    """
-    Find available hotel room matching criteria
-
-    Returns:
-        Tuple of (Hotel, Room) or None if not found
-    """
-    # Find hotels in the city
-    matching_hotels = [h for h in self.hotels if h.city == city]
-
-    if not matching_hotels:
-        return None
-
-    # Generate list of dates needed
-    from datetime import datetime, timedelta
-    start = datetime.fromisoformat(check_in)
-    end = datetime.fromisoformat(check_out)
-    dates = []
-    current = start
-    while current < end:
-        dates.append(current.strftime('%Y-%m-%d'))
-        current += timedelta(days=1)
-
-    # Check each hotel for available room
-    for hotel in matching_hotels:
-        for room in hotel.rooms:
-            if room.room_type == room_type and room.is_available(dates):
-                return (hotel, room)
-
-    return None
-
 @dataclass
 class HotelReservationRequest:
     confirmation_code: str
+    city: str
     hotel_name: str
     room_type: str
     check_in: str
     check_out: str
+
 
 @dataclass
 class CompletedHotelReservation:
@@ -199,6 +172,11 @@ class CompletedHotelReservation:
     check_out: str
     price: float
     booked_at: str
+
+    def nights(self) -> int:
+        dep_date = datetime.fromisoformat(self.check_out)
+        ret_date = datetime.fromisoformat(self.check_in)
+        return (ret_date - dep_date).days
 
 @dataclass
 class Car:
@@ -222,6 +200,7 @@ class Car:
             if date not in self.unavailable_dates:
                 self.unavailable_dates.append(date)
 
+
 @dataclass
 class CarReservationRequest:
     confirmation_code: str
@@ -229,6 +208,7 @@ class CarReservationRequest:
     car_type: str
     pickup_date: str
     return_date: str
+
 
 @dataclass
 class CompletedCarReservation:
@@ -241,6 +221,7 @@ class CompletedCarReservation:
     price: float
     booked_at: str
 
+
 @dataclass
 class CompletedTravelBooking:
     """Master travel package with payment"""
@@ -251,16 +232,19 @@ class CompletedTravelBooking:
     total_price: float
     booked_at: str
 
+
 ### Payment Stuff
 @dataclass
 class PaymentRequest:
     confirmation_code: str
     price: float
 
+
 @dataclass
 class CompletedPayment:
     id: str
     confirmation_code: str
+
 
 class BookingDatabase:
     """Central database for all travel bookings"""
@@ -273,31 +257,27 @@ class BookingDatabase:
         self.hotels: List[Hotel] = []
         self.cars: List[Car] = []
 
-        # Completed reservations (no payment_id in these)
-        self.completed_flights: Dict[str, CompletedFlightReservation] = {}
-        self.completed_hotels: Dict[str, CompletedHotelReservation] = {}
-        self.completed_cars: Dict[str, CompletedCarReservation] = {}
+        # Booking requests (original customer requests)
+        self.booking_requests: Dict[str, TravelBookingRequest] = {}
 
-        # Master travel bookings (payment_id here)
+        # Completed reservations (stored by confirmation_code)
+        self.flight_reservations: Dict[str, CompletedFlightReservation] = {}
+        self.hotel_reservations: Dict[str, CompletedHotelReservation] = {}
+        self.car_reservations: Dict[str, CompletedCarReservation] = {}
+
+        # Master travel bookings (with payment_id)
         self.completed_bookings: Dict[str, CompletedTravelBooking] = {}
 
     def add_booking_request(self, confirmation_code: str, request: TravelBookingRequest):
+        """Store the original booking request"""
         self.booking_requests[confirmation_code] = request
 
     def get_booking_request(self, confirmation_code: str) -> TravelBookingRequest:
+        """Retrieve the original booking request"""
         return self.booking_requests[confirmation_code]
 
-    def add_flight_reservation(self, confirmation_code: str, flight: CompletedFlightReservation):
-        self.flight_reservations[confirmation_code] = flight
-
-    def get_flight_reservations(self) -> Dict[str, CompletedFlightReservation]:
-        return self.flight_reservations
-
-    def remove_flight_reservation(self, confirmation_code: str):
-        if confirmation_code in self.flight_reservations:
-            del self.flight_reservations[confirmation_code]
-
     def find_flight(self, flight_number: str, date: str) -> Optional[FlightInstance]:
+        """Find a specific flight instance"""
         for fi in self.flight_instances:
             if fi.flight_number == flight_number and fi.date == date:
                 return fi
@@ -372,7 +352,6 @@ class BookingDatabase:
             return None
 
         # Generate list of dates needed
-        from datetime import datetime, timedelta
         start = datetime.fromisoformat(check_in)
         end = datetime.fromisoformat(check_out)
         dates = []
@@ -385,7 +364,7 @@ class BookingDatabase:
         for hotel in matching_hotels:
             for room in hotel.rooms:
                 if room.room_type == room_type and room.is_available(dates):
-                    return (hotel, room)
+                    return hotel, room
 
         return None
 
@@ -410,7 +389,6 @@ class BookingDatabase:
             return None
 
         # Generate list of dates needed
-        from datetime import datetime, timedelta
         start = datetime.fromisoformat(pickup_date)
         end = datetime.fromisoformat(return_date)
         dates = []
@@ -429,6 +407,7 @@ class BookingDatabase:
         return None
 
     def get_available_seats(self, flight_number: str, date: str, carriage_class: str) -> List[SeatInstance]:
+        """Get all available seats in a specific class"""
         instance = self.get_flight_instance(flight_number, date)
         if not instance:
             return []
@@ -436,49 +415,12 @@ class BookingDatabase:
         return [s for s in instance.seats
                 if s.carriage_class == carriage_class and s.is_available]
 
-    def add_hotel_reservation(self, confirmation_code: str, hotel: CompletedHotelReservation):
-        self.hotel_reservations[confirmation_code] = hotel
-
-    def get_hotel_reservations(self) -> Dict[str, CompletedHotelReservation]:
-        return self.hotel_reservations
-
-    def remove_hotel_reservation(self, confirmation_code: str):
-        if confirmation_code in self.hotel_reservations:
-            del self.hotel_reservations[confirmation_code]
-
     def find_hotel_by_city(self, city: str) -> Optional[Hotel]:
         """Find first hotel in a city"""
         for hotel in self.hotels:
             if hotel.city == city:
                 return hotel
         return None
-
-    def add_car_reservation(self, confirmation_code: str, car: CompletedCarReservation):
-        self.car_reservations[confirmation_code] = car
-
-    def remove_car_reservation(self, confirmation_code: str):
-        """Remove (cancel) car reservation"""
-        if confirmation_code in self.car_reservations:
-            del self.car_reservations[confirmation_code]
-
-    def find_available_car(self, location: str, car_type: str, dates: List[str]) -> Optional[Car]:
-        """Find first available car of type at location"""
-        for car in self.cars:
-            if (car.location == location and
-                    car.car_type == car_type and
-                    car.is_available(dates)):
-                return car
-        return None
-
-    def get_full_reservation(self, confirmation_code: str) -> dict:
-        """Get all reservations for a confirmation code"""
-        return {
-            'flight': self.flight_reservations.get(confirmation_code),
-            'hotel': self.hotel_reservations.get(confirmation_code),
-            'car': self.car_reservations.get(confirmation_code),
-        }
-
-    # database.py - Add these methods to BookingDatabase
 
     def get_flight_instance(self, flight_number: str, date: str) -> Optional[FlightInstance]:
         """Get specific flight instance by number and date"""
@@ -579,7 +521,9 @@ class BookingDatabase:
             if seat.carriage_class == carriage_class and seat.is_available
         )
 
+
 _global_db = None
+
 
 def get_booking_database() -> BookingDatabase:
     """Get or create the global booking database singleton"""
