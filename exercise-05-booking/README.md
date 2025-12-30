@@ -41,22 +41,23 @@ Result: Customer not charged, all resources released!
 ```
 exercise-05-booking/
 ├── README.md                      # This file
-├── README-original.md             # Guide for the simplified pre-Temporal version
 │
-├── original/                      # Simplified pre-Temporal version
-│   ├── models.py                  # Simple dataclasses
-│   └── booking_system.py          # Messy code demonstrating the saga problem
+├── solution/                      # Folder for solution
+│   ├── database.py                # Data models and booking database
+│   ├── seed_data_loader.py        # Loads airports, flights, hotels, cars
+│   ├── travel-seed-data.json      # Seed data for 12 airports, routes, hotels
+│   │
+│   ├── activities.py              # Booking + Compensation activities
+│   ├── workflow.py                # Saga orchestration workflow
+│   ├── worker.py                  # Temporal worker
+│   ├── client.py                  # Test client (high-volume, 43 bookings)
+│   │
+│   └── docker-compose.yml         # Temporal server (if needed)
 │
-├── database.py                    # Data models and booking database
-├── seed_data_loader.py            # Loads airports, flights, hotels, cars
-├── travel-seed-data.json          # Seed data for 12 airports, routes, hotels
-│
-├── activities.py                  # Booking + Compensation activities
-├── workflow.py                    # Saga orchestration workflow
-├── worker.py                      # Temporal worker
-├── client.py                      # Test client (high-volume, 43 bookings)
-│
-└── docker-compose.yml             # Temporal server (if needed)
+└── original/                      # Simplified pre-Temporal version
+    ├── models.py                  # Simple dataclasses
+    └── pre-temporal.py            # Messy code demonstrating the saga problem
+
 ```
 
 ## Prerequisites
@@ -74,14 +75,8 @@ pip install temporalio
 ```
 
 ### 2. Start Temporal Server
+This starts the CLI version of Temporal, or you can use Docker
 
-**Option A: Docker (Recommended)**
-```bash
-# In the exercise directory
-docker-compose up -d
-```
-
-**Option B: Temporal CLI**
 ```bash
 temporal server start-dev
 ```
