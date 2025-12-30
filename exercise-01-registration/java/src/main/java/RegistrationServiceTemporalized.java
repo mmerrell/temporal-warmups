@@ -1,81 +1,22 @@
+import domain.User;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
 /**
- * Messy pre-Temporal user registration service.
- *
- * This is the "before" version - demonstrating problems with traditional approaches:
- * - No retry logic: transient failures cause complete registration failure
- * - No durability: if process crashes, all progress is lost
- * - No visibility: can't see workflow state or progress
- * - No recovery: can't resume from the point of failure
- * - All-or-nothing: can't retry just the failed step
- *
- * Compare this to the Temporal version to understand the value Temporal provides.
+ * Temporalized service
  */
-public class RegistrationService {
+public class RegistrationServiceTemporalized {
 
     private Map<String, User> usersDb;
     private int emailSentCount;
     private Random random;
 
-    public RegistrationService() {
+    public RegistrationServiceTemporalized() {
         this.usersDb = new HashMap<>();
         this.emailSentCount = 0;
         this.random = new Random();
-    }
-
-    /**
-     * Inner User class to hold user data
-     */
-    static class User {
-        String email;
-        String username;
-        String password;  // WARNING: In real life, NEVER store plaintext passwords!
-        boolean verified;
-        long createdAt;
-
-        User(String email, String username, String password) {
-            this.email = email;
-            this.username = username;
-            this.password = password;
-            this.verified = false;
-            this.createdAt = System.currentTimeMillis();
-        }
-
-        @Override
-        public String toString() {
-            return String.format("User{email='%s', username='%s', verified=%s}",
-                email, username, verified);
-        }
-    }
-
-    /**
-     * Result object for registration operation
-     */
-    static class RegistrationResult {
-        boolean success;
-        String userId;
-        String verificationToken;
-        String error;
-
-        RegistrationResult(boolean success, String userId, String verificationToken, String error) {
-            this.success = success;
-            this.userId = userId;
-            this.verificationToken = verificationToken;
-            this.error = error;
-        }
-
-        @Override
-        public String toString() {
-            if (success) {
-                return String.format("RegistrationResult{success=true, userId='%s', token='%s'}",
-                    userId, verificationToken);
-            } else {
-                return String.format("RegistrationResult{success=false, error='%s'}", error);
-            }
-        }
     }
 
     /**
@@ -99,56 +40,19 @@ public class RegistrationService {
     /**
      * Step 2: Create user in database
      */
-    public String createUserRecord(String email, String username, String password) {
-        System.out.println("Creating user record for " + username + "...");
-        sleep(1000);  // Simulate database write (1s to match Python)
-
-        // Simulate occasional database failures (10% chance)
-        if (random.nextDouble() < 0.1) {
-            throw new RuntimeException("Database connection timeout");
-        }
-
-        String userId = "user_" + (usersDb.size() + 1);
-        User user = new User(email, username, password);
-        usersDb.put(userId, user);
-
-        System.out.println("✓ User created with ID: " + userId);
-        return userId;
-    }
 
     /**
      * Step 3: Send welcome email to new user
      */
     public boolean sendWelcomeEmail(String email, String username) {
-        System.out.println("Sending welcome email to " + email + "...");
-        sleep(800);  // Simulate email sending (0.8s to match Python)
 
-        // Simulate occasional email service failures (15% chance)
-        if (random.nextDouble() < 0.15) {
-            throw new RuntimeException("Email service unavailable");
-        }
-
-        emailSentCount++;
-        System.out.println("✓ Welcome email sent (total sent: " + emailSentCount + ")");
-        return true;
     }
 
     /**
      * Step 4: Send verification link
      */
     public String sendVerificationEmail(String email, String userId) {
-        System.out.println("Sending verification email to " + email + "...");
-        sleep(800);  // Simulate email sending (0.8s to match Python)
 
-        // Simulate occasional email service failures (15% chance)
-        if (random.nextDouble() < 0.15) {
-            throw new RuntimeException("Email service unavailable");
-        }
-
-        String verificationToken = "token_" + userId + "_" + System.currentTimeMillis();
-        emailSentCount++;
-        System.out.println("✓ Verification email sent with token: " + verificationToken);
-        return verificationToken;
     }
 
     /**
@@ -210,7 +114,7 @@ public class RegistrationService {
      * Usage example - demonstrates the problems with this approach
      */
     public static void main(String[] args) {
-        RegistrationService service = new RegistrationService();
+        RegistrationServiceTemporalized service = new RegistrationServiceTemporalized();
 
         // Try registering users (matching Python's test cases)
         RegistrationResult result1 = service.registerUser(
