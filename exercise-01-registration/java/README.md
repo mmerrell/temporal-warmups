@@ -83,6 +83,8 @@ Temporal solves all of these problems!
 
 ## Breaking down the problem
 
+If you can't solve the `/exercise` then you will find the answer in the `/solution` folder.
+
 1. Separate Concerns: Workflow vs Activities
 
 Current state: Everything is in one monolithic class.

@@ -5,8 +5,10 @@ import solution.domain.User;
 import io.temporal.workflow.WorkflowInterface;
 import io.temporal.workflow.WorkflowMethod;
 
+import java.util.List;
+
 @WorkflowInterface
 public interface RegistrationWorkflow {
     @WorkflowMethod
-    RegistrationResult registerUser(User user) throws InterruptedException;
+    List<RegistrationResult> registerUser(List<User> user) throws InterruptedException;
 }
