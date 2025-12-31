@@ -108,7 +108,7 @@ Why: Temporal uses interfaces for type-safe activity invocation. The interface d
 
 3. Create Workflow Interface and Implementation
 
-What: Define a workflow interface (e.g., RegistrationWorkflow) with a single method (the workflow entry point), then implement the orchestration logic.
+What: Define a workflow interface (e.g., solution.temporal.RegistrationWorkflow) with a single method (the workflow entry point), then implement the orchestration logic.
 
 Key differences from current code:
 - No direct method calls - use Activity stubs
@@ -127,7 +127,7 @@ What: A separate class with a main() method that:
 
 Why: Workers are the execution engines. They must be running for workflows to execute. You can have multiple workers for horizontal scaling.
 
-5. Create the Client (Starter)
+5. Create the Client (solution.temporal.Starter)
 
 What: A separate class that:
 - Connects to Temporal server
@@ -158,8 +158,8 @@ Why: Temporal serializes data to JSON. Keep it simple - strings, numbers, basic 
 Reorganize into:
 src/main/java/
 ├── workflows/
-│   ├── RegistrationWorkflow.java (interface)
-│   └── RegistrationWorkflowImpl.java
+│   ├── solution.temporal.RegistrationWorkflow.java (interface)
+│   └── solution.temporal.RegistrationWorkflowImpl.java
 ├── activities/
 │   ├── RegistrationActivities.java (interface)
 │   └── RegistrationActivitiesImpl.java

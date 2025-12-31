@@ -1,9 +1,11 @@
-import domain.Email;
+package solution.temporal;
+
+import solution.domain.Email;
 import io.temporal.activity.ActivityInterface;
 import io.temporal.activity.ActivityMethod;
 
 @ActivityInterface
 public interface EmailActivity {
     @ActivityMethod
-    String sendWelcomeEmail(Email email) throws InterruptedException;
+    void sendWelcomeEmail(Email email) throws InterruptedException;
 }

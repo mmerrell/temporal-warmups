@@ -1,4 +1,4 @@
-package domain;
+package solution.domain;
 
 /**
  * Result object for registration operation
@@ -8,6 +8,9 @@ public class RegistrationResult {
     public String userId;
     public String verificationToken;
     String error;
+
+    public RegistrationResult() {
+    }
 
     public RegistrationResult(boolean success, String userId, String verificationToken, String error) {
         this.success = success;

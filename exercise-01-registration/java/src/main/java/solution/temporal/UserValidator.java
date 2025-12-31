@@ -1,4 +1,6 @@
-import domain.User;
+package solution.temporal;
+
+import solution.domain.User;
 
 import static java.lang.Thread.sleep;
 

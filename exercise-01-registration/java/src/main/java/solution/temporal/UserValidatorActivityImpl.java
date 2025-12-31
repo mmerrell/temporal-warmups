@@ -1,4 +1,6 @@
-import domain.User;
+package solution.temporal;
+
+import solution.domain.User;
 
 public class UserValidatorActivityImpl implements UserValidatorActivity {
 

@@ -1,6 +1,8 @@
-import domain.Email;
-import domain.RegistrationResult;
-import domain.User;
+package solution.temporal;
+
+import solution.domain.Email;
+import solution.domain.RegistrationResult;
+import solution.domain.User;
 import io.temporal.activity.ActivityOptions;
 import io.temporal.common.RetryOptions;
 import io.temporal.workflow.Workflow;

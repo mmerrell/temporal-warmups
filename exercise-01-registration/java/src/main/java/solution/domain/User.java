@@ -1,4 +1,4 @@
-package domain;
+package solution.domain;
 
 public class User {
     public String email;
@@ -7,12 +7,15 @@ public class User {
     boolean verified;
     long createdAt;
 
+    public User() {
+    }
+
     public User(String email, String username, String password) {
         this.email = email;
         this.username = username;
         this.password = password;
         this.verified = false;
-        this.createdAt = System.currentTimeMillis();
+//        this.createdAt = System.currentTimeMillis();
     }
 
     @Override

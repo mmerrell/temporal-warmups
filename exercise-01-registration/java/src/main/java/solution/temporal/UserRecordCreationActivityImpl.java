@@ -1,4 +1,6 @@
-import domain.User;
+package solution.temporal;
+
+import solution.domain.User;
 
 public class UserRecordCreationActivityImpl implements UserRecordCreationActivity{
 
@@ -8,7 +10,7 @@ public class UserRecordCreationActivityImpl implements UserRecordCreationActivit
         this.userCreator = userCreator;
     }
     @Override
-    public String createUserRecord(User user) {
+    public String createUserRecord(User user) throws InterruptedException {
         return userCreator.createUserRecord(user);
     }
 }
