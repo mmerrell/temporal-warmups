@@ -9,7 +9,7 @@ import java.util.Random;
 import static java.lang.Thread.sleep;
 
 public class UserCreator {
-    Map<String, User> usersDb;
+    private Map<String, User> usersDb;
 
     public UserCreator() {
         usersDb = new HashMap<>();
