@@ -14,7 +14,7 @@ public class UserValidator {
         if (myUser.email == null || !myUser.email.contains("@")) {
             throw new IllegalArgumentException("Invalid email address");
         }
-        if (myUser.password.length() < 8) {
+        if (myUser.password == null || myUser.password.length() < 8) {
             throw new IllegalArgumentException("Password must be at least 8 characters");
         }
 
