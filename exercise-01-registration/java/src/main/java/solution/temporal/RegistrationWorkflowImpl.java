@@ -36,7 +36,7 @@ public class RegistrationWorkflowImpl implements RegistrationWorkflow{
                     .build()
     );
 
-    private EmailActivity welcomeEmailActivity = Workflow.newActivityStub(EmailActivity.class,
+    private final EmailActivity welcomeEmailActivity = Workflow.newActivityStub(EmailActivity.class,
             ActivityOptions.newBuilder()
                     .setStartToCloseTimeout(Duration.ofSeconds(30))
                     .setRetryOptions(RetryOptions.newBuilder()
