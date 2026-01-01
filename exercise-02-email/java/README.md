@@ -6,7 +6,7 @@ You have a simple two-step email verification workflow:
 1. Generate a unique verification token
 2. Send an email with that token
 
-This is a **muscle memory builder** - practice the basic Temporal workflow pattern without the complexity of databases or multiple data models. If you completed Exercise 01, you should be able to complete this in 45 minutes or less.
+This is a **muscle memory builder** - practice the basic Temporal workflow pattern without the complexity of databases or multiple data models. Target: 30-45 minutes.
 
 ## Run the Pre-Temporal Baseline
 
@@ -14,12 +14,7 @@ This is a **muscle memory builder** - practice the basic Temporal workflow patte
 mvn compile exec:java
 ```
 
-Watch what happens when the email service fails (10% random failure rate). The entire verification fails - no retries, no recovery. The process is fragile.
-
-Expected output shows:
-- Token generation using SecureRandom
-- Email sending with occasional failures
-- Complete verification failure when email fails (no retry)
+Watch what happens when the email service fails (10% random failure rate). The entire verification fails - no retries, no recovery.
 
 **Problems you'll observe:**
 1. No retry logic - transient email failures cause permanent failures
@@ -29,238 +24,472 @@ Expected output shows:
 
 ## Your Task
 
-Convert this simple flow into a durable Temporal workflow with automatic retry handling.
+Convert this into a durable Temporal workflow. We'll build it **backwards** - starting with the workflow (what we want to happen), then the worker and starter (how we run it), then implementing the activities they need.
 
-## Breaking Down the Problem
+Why backwards? Because understanding the goal first makes the implementation choices clearer.
 
-### Think About Activities vs Workflow
+## Implementation Guide - Building From the Goal
 
-**Question:** Which operations in this code are non-deterministic (could produce different results or fail unpredictably)?
+### Step 1: Create the Domain Model
 
-Look at the two main operations:
-- `generateToken()` - Uses `SecureRandom` and `Thread.sleep()`
-- `sendVerificationEmail()` - Simulates external email API with random failures
+**What are you creating?** A result object that your workflow returns.
 
-**Question:** Why separate these into two activities instead of one?
+**Think about it:** What information does the caller need to know?
+- Did verification succeed?
+- What email was verified?
+- What was the token (for testing/logging)?
+- If it failed, what went wrong?
 
-Think about what should happen if the email fails but the token was already generated. Should you:
-- Generate a new token and try again? (wasteful, confusing)
-- Reuse the same token and retry just the email? (correct!)
+**Create:** `src/main/java/solution/domain/VerificationResult.java`
 
-This is why we need **two separate activities** - each can be retried independently.
+**Structure it with:**
+```java
+public class VerificationResult {
+    public boolean success;
+    // What other fields? Think about what the workflow produces...
 
-### Pattern Recognition from Exercise 01
+    // Why do you need an empty constructor?
+    // Hint: Temporal deserializes this from JSON
 
-If you completed Exercise 01, you learned about:
-- The three-layer activity pattern (interface → implementation → business logic helper)
-- Interface-based workflow design
-- Activity stubs and configuration
-- Retry policies and timeouts
-- Worker and client setup
-
-**Exercise 02 follows the exact same patterns**, just simpler:
-- Fewer activities (2 instead of 4)
-- Simpler data types (just strings)
-- No database interactions
-
-### Key Concepts to Apply
-
-#### 1. Separating Non-Deterministic Operations
-
-**Workflow code** must be deterministic:
-- Same inputs always produce same outputs
-- No `Random`, `System.currentTimeMillis()`, `UUID.randomUUID()` directly in workflow
-- Use `Workflow.newRandom()`, `Workflow.currentTimeMillis()`, `Workflow.randomUUID()` instead
-
-**Activity code** can be non-deterministic:
-- Call external APIs
-- Use random number generators
-- Read from databases
-- Send emails
-- Use `Thread.sleep()`, `SecureRandom`, etc.
-
-**Question:** Where does token generation belong - workflow or activity? Why?
-
-#### 2. State Passing Between Activities
-
-The workflow orchestrates the flow of data:
-```
-Activity 1 (generate token) → returns token string
-                           ↓
-Activity 2 (send email) → takes email + token as input
+    // Add a helpful toString() for debugging
+}
 ```
 
-The workflow stores no state itself - it just coordinates. The token is passed as a parameter.
+**The insight:** This is your contract between the workflow and its caller. Keep it simple - just data, no logic. Public fields are fine for DTOs in Temporal (it's not breaking encapsulation since there's no invariant to protect).
 
-#### 3. Retry Policies
+### Step 2: Create the Workflow Interface
 
-When you create activity stubs in your workflow, you configure retry behavior:
-- How many attempts?
-- How long to wait between retries?
-- Exponential backoff?
+**What are you creating?** The public API of your workflow - what does it do, what does it need, what does it return?
 
-**Think:** For this email verification scenario, what's a reasonable retry policy?
-- Too few retries: might give up on transient failures
-- Too many retries: might waste resources on permanent failures
+**Think about it:**
+- What's the workflow's job? (Verify an email address)
+- What input does it need? (Just an email string)
+- What should it return? (Your VerificationResult from Step 1)
 
-#### 4. Type Serialization
+**Create:** `src/main/java/solution/temporal/EmailVerificationWorkflow.java`
 
-Temporal serializes workflow inputs/outputs to JSON. Keep it simple:
+**Structure it with:**
+```java
+@WorkflowInterface
+public interface EmailVerificationWorkflow {
+    @WorkflowMethod
+    // What's the method signature?
+    // Takes: an email (String)
+    // Returns: VerificationResult
+}
+```
 
-**Works:**
-- String, int, long, boolean, double
-- Simple POJOs with public fields
-- Empty constructor required
+**The insight:** Temporal workflows are defined by interfaces, not classes. Why? Because Temporal creates dynamic proxies to route calls through its orchestration engine. The interface is your contract - the implementation is where the magic happens.
 
-**Doesn't work:**
-- Enums (without custom serialization)
-- Complex nested objects
-- Circular references
+### Step 3: Implement the Workflow
 
-**Question:** What data structure should your workflow return?
-- Just a boolean (success/failure)?
-- An object with email, token, link, and error details?
+**What are you creating?** The orchestration brain - what steps happen, in what order, with what data.
 
-### Implementation Path
+**Think about the flow:**
+1. Generate a token (activity)
+2. Send email with that token (activity)
+3. Return success or failure
 
-You'll need to create several components. Think about what each one does:
+**Create:** `src/main/java/solution/temporal/EmailVerificationWorkflowImpl.java`
 
-**Domain Models:**
-- What data do you need to pass around?
-- What should the workflow return?
+**Start with the skeleton:**
+```java
+public class EmailVerificationWorkflowImpl implements EmailVerificationWorkflow {
 
-**Activities:**
-- How do you define activity interfaces in Temporal?
-- What pattern did Exercise 01 use for separating interface, implementation, and business logic?
+    // First, configure how activities should behave
+    private static final ActivityOptions ACTIVITY_OPTIONS = ActivityOptions.newBuilder()
+        .setStartToCloseTimeout(Duration.ofMinutes(?))  // How long can one attempt take?
+        .setRetryOptions(RetryOptions.newBuilder()
+            .setMaximumAttempts(?)     // How many times to retry?
+            .setInitialInterval(?)      // Wait how long before first retry?
+            .setBackoffCoefficient(?)   // Multiply wait time by what?
+            .build())
+        .build();
 
-**Workflow:**
-- How do you create activity stubs?
-- How do you configure retry policies?
-- How do you handle exceptions?
+    // Create activity stubs (you'll define these interfaces in Step 6)
+    // What two activities do you need? Token generation and email sending...
 
-**Worker:**
-- How do you register workflows and activities?
-- What task queue name should you use?
+    @Override
+    public VerificationResult run(String email) {
+        // Step 1: Call token generation activity, get token
+        // Step 2: Call email sending activity with email + token, get link
+        // Step 3: Return success result
+        // Handle exceptions and return failure result
+    }
+}
+```
 
-**Client/Starter:**
-- How do you create a workflow stub?
-- How do you execute a workflow?
+**Questions to guide you:**
+- Why are activity stubs created as fields, not local variables?
+- What should `setMaximumAttempts(?)` be? Think about the 10% failure rate
+- Why exponential backoff? (Hint: gives failing services time to recover)
+- How do you call an activity? (Look at how you create the stub - it's type-safe!)
 
-**Hint:** Look at Exercise 01's structure. The patterns are identical, just with different activity names and data types.
+**The insight:** The workflow is pure coordination - it doesn't DO the work, it ORCHESTRATES it. Notice you're not calling `new TokenGenerator()` - you're calling through activity stubs. Temporal intercepts these calls and makes them durable. If the worker crashes between generating the token and sending the email, Temporal will resume and skip straight to the email step!
 
-## What to Observe When Testing
+### Step 4: Create the Worker
 
-After implementing your Temporal version:
+**What are you creating?** The execution engine - the process that actually runs your workflow and activity code.
 
-1. **Automatic Retries:**
-   - Run your worker and client
-   - Watch the console when email fails (10% of the time)
-   - See Temporal automatically retry just the email step
-   - Token is NOT regenerated during retries
+**Think about it:** A workflow is just a plan. Someone has to execute it! That's the worker.
 
-2. **Temporal UI:**
-   - Open http://localhost:8233
-   - Find your workflow execution
-   - Click into it - see both activities in the timeline
-   - Look at Event History - see retry attempts
-   - Notice how the token is passed from activity 1 to activity 2
+**Create:** `src/main/java/solution/temporal/WorkerApp.java`
 
-3. **Durability:**
-   - Start a workflow execution
-   - Kill the worker process (Ctrl+C) mid-execution
-   - Restart the worker
-   - Watch the workflow resume and complete
-   - This is durable execution in action!
+**Structure:**
+```java
+public class WorkerApp {
+    private static final String TASK_QUEUE = "email-verification-tasks";
 
-## Success Criteria
+    public static void main(String[] args) {
+        // 1. Connect to Temporal server
+        // Create WorkflowServiceStubs (connects to localhost:7233)
+        // Create WorkflowClient from service
 
-- Both activities execute sequentially
-- Workflows complete successfully (check Temporal UI at http://localhost:8233)
-- Automatic retries handle email failures (10% of the time)
-- No manual retry logic in your code
-- Can complete the exercise in **under 45 minutes** (first time)
+        // 2. Create a worker on your task queue
+        // WorkerFactory, then Worker
 
-## Mental Model Shift
+        // 3. Tell the worker what workflows it can execute
+        // worker.registerWorkflowImplementationTypes(?)
 
-**Before Temporal:**
-> "If email fails, everything fails. Start over from scratch. Generate new token, try again."
+        // 4. Tell the worker what activities it can execute
+        // (Skip for now - we'll add this in Step 10)
 
-**After Temporal:**
-> "Token generated once. If email fails, Temporal retries just that step with the same token. If process crashes, workflow resumes from last completed activity. I can see the entire execution history in the UI."
+        // 5. Start the worker - it runs forever, polling for tasks
+        // factory.start()
+    }
+}
+```
 
-## Common Pitfalls
+**Questions to ponder:**
+- Why a task queue? (Hint: it's how workflows find workers)
+- Why does the worker run forever? (It's polling for work constantly)
+- What if you have multiple workers on the same queue? (Temporal load-balances!)
 
-1. **Forgetting empty constructors in POJOs**
-   - Temporal needs them for deserialization
-   - Add `public ClassName() {}` to all data classes
+**The insight:** Workers are stateless executors. You can start 10 workers on the same task queue and Temporal will distribute work among them. Scale horizontally by adding more workers - no code changes needed!
 
-2. **Using non-deterministic functions in workflow code**
-   - Don't use `System.currentTimeMillis()` or `new Random()` in workflow
-   - Use `Workflow.currentTimeMillis()` or `Workflow.newRandom()` instead
+### Step 5: Create the Starter (Client)
 
-3. **Not configuring retry policies**
-   - Activities won't retry without explicit configuration in ActivityOptions
-   - Set `RetryOptions` when creating activity stubs
+**What are you creating?** The trigger - what starts workflow executions.
 
-4. **Mismatched task queue names**
-   - Worker and client must use the same task queue name
-   - Pick one name (e.g., "email-verification-tasks") and use it consistently
+**Think about it:** You've defined the workflow, you've created the worker to execute it. But how do you actually RUN a workflow? That's what the starter does.
 
-5. **Trying to run workflow before worker is started**
-   - Start worker first (runs forever, listening)
-   - Then run client (executes once, triggers workflow)
+**Create:** `src/main/java/solution/temporal/Starter.java`
 
-## Hints
+**Build it to:**
+```java
+public class Starter {
+    private static final String TASK_QUEUE = // Same as worker!
 
-**Java equivalents for Python concepts:**
-- Python's `secrets.token_urlsafe()` → Java's `SecureRandom` + `Base64.getUrlEncoder()`
-- Python's `time.sleep()` → Java's `Thread.sleep()` (okay in activities, not in workflow)
-- Python's activity logging → Java's `Activity.getExecutionContext().getLogger()`
-- Python's workflow logging → Java's `Workflow.getLogger(ClassName.class)`
+    public static void main(String[] args) {
+        // 1. Connect to Temporal server (same as worker)
 
-**Pattern reference:**
-- Look at Exercise 01 for the three-layer activity pattern
-- See how Worker registers both workflows and activities
-- Notice how Client creates workflow stubs with options
-- Study the retry policy configuration in Exercise 01
+        // 2. Define test emails
+        String[] emails = {"alice@example.com", "bob@example.com", "charlie@example.com"};
 
-**Maven commands:**
-- Compile: `mvn compile`
-- Run baseline: `mvn compile exec:java`
-- After you implement the solution, you can add additional execution configurations
+        // 3. For each email:
+        for (String email : emails) {
+            // Create a unique workflow ID (use UUID)
 
-## Code Snippet Examples
+            // Create a workflow stub (typed to your interface!)
+            // You'll need WorkflowOptions with:
+            //   - setTaskQueue() - must match worker
+            //   - setWorkflowId() - unique ID you just created
 
-**Activity Interface Pattern:**
+            // Execute the workflow by calling run(email)
+            // This blocks until the workflow completes!
+
+            // Print the result
+        }
+
+        System.exit(0);  // Exit cleanly when done
+    }
+}
+```
+
+**Here's the magic moment:** When you call `workflow.run(email)`, you're not calling your implementation directly! You're calling through a Temporal-created proxy that:
+1. Serializes the input
+2. Sends it to the Temporal server
+3. Returns an ID
+4. Polls for completion
+5. Deserializes the result
+
+**The insight:** The client and worker can be in completely different processes, even different languages! The client just speaks to Temporal, and Temporal coordinates with workers. This is distributed computing made simple.
+
+### Step 6: Create Activity Interfaces
+
+**What are you creating?** Contracts for your two activities - token generation and email sending.
+
+**Think about it:** Your workflow needs to call these activities. What should their signatures be?
+
+**Create two interfaces:**
+
+`src/main/java/solution/temporal/TokenGeneratorActivity.java`:
 ```java
 @ActivityInterface
 public interface TokenGeneratorActivity {
     @ActivityMethod
-    String generateToken(String email);
+    // What does token generation need? (email)
+    // What does it return? (token string)
 }
 ```
 
-**Activity Options Pattern:**
+`src/main/java/solution/temporal/EmailSenderActivity.java`:
 ```java
-ActivityOptions options = ActivityOptions.newBuilder()
-    .setStartToCloseTimeout(Duration.ofMinutes(5))
-    .setRetryOptions(RetryOptions.newBuilder()
-        .setMaximumAttempts(3)
-        .setInitialInterval(Duration.ofSeconds(1))
-        .setMaximumInterval(Duration.ofSeconds(10))
-        .setBackoffCoefficient(2.0)
-        .build())
-    .build();
+@ActivityInterface
+public interface EmailSenderActivity {
+    @ActivityMethod
+    // What does email sending need? (email + token)
+    // What does it return? (verification link string)
+}
 ```
 
-**Creating Activity Stub:**
+**Why interfaces again?** Same reason as workflows - Temporal creates proxies. When your workflow calls `tokenGenerator.generateToken(email)`, Temporal intercepts this, records it in history, schedules it on a worker, handles retries, etc. The interface is the contract, the implementation is the work.
+
+**The insight:** Keep activity interfaces simple. Primitives and simple types only. Complex objects? Create POJOs (like VerificationResult). Temporal serializes everything to JSON, so keep it serializable!
+
+### Step 7: Create Activity Implementations
+
+**What are you creating?** The glue between Temporal and your business logic.
+
+**Think about it:** Why not just put the business logic directly in these implementations? Because separation of concerns! Your business logic shouldn't know about Temporal. These implementations are thin adapters.
+
+**Create two implementations:**
+
+`src/main/java/solution/temporal/TokenGeneratorActivityImpl.java`:
 ```java
-private final TokenGeneratorActivity tokenGenerator =
-    Workflow.newActivityStub(TokenGeneratorActivity.class, options);
+public class TokenGeneratorActivityImpl implements TokenGeneratorActivity {
+    private final TokenGenerator tokenGenerator;
+
+    public TokenGeneratorActivityImpl(TokenGenerator tokenGenerator) {
+        // Constructor injection - we'll pass in the helper
+    }
+
+    @Override
+    public String generateToken(String email) {
+        // Just delegate to the helper
+        // return tokenGenerator.generateToken(email);
+    }
+}
 ```
 
-These are patterns, not complete implementations. Discover the full structure by applying these concepts!
+`src/main/java/solution/temporal/EmailSenderActivityImpl.java`:
+```java
+public class EmailSenderActivityImpl implements EmailSenderActivity {
+    private final EmailSender emailSender;
 
-## Ready?
+    // Same pattern - constructor injection, delegation
+}
+```
 
-Start by thinking through what activities you need, then build from there. Reference Exercise 01 when you get stuck. You've got this!
+**Why this three-layer pattern?** (Interface → Implementation → Helper)
+1. **Interface:** Temporal's contract
+2. **Implementation:** Temporal-aware adapter (can use Temporal utilities like Activity.getExecutionContext())
+3. **Helper:** Pure business logic, no Temporal dependencies, easy to unit test
+
+**The insight:** You can test `TokenGenerator` without any Temporal infrastructure. You can swap implementations. You keep concerns separated. This is good software engineering!
+
+### Step 8: Create Business Logic Helpers
+
+**What are you creating?** The actual work - token generation and email sending.
+
+**This is where you can finally use non-deterministic operations!**
+
+**Create:** `src/main/java/solution/temporal/TokenGenerator.java`
+
+Look at the baseline `EmailVerificationService.java` - you already have the `generateToken()` logic there! Copy it into a new class:
+- Generate 32 random bytes using `SecureRandom`
+- Encode to URL-safe Base64 string (Java's equivalent of Python's `secrets.token_urlsafe`)
+- Add console logging
+- Sleep 300ms to simulate work
+
+**Create:** `src/main/java/solution/temporal/EmailSender.java`
+
+Again, steal from the baseline's `sendVerificationEmail()`:
+- Sleep 500ms to simulate API call
+- Random 10% failure rate: `if (random.nextDouble() < 0.1) throw RuntimeException`
+- Build verification link from token
+- Return the link
+
+**Questions to explore:**
+- Why can you use `Random` here but not in the workflow?
+- What happens when you throw that exception? (Temporal catches it and retries!)
+- Why separate these into their own classes instead of putting logic in activity impls?
+
+**The insight:** This is pure Java - no Temporal! You could unit test these classes with JUnit without any Temporal test infrastructure. You could reuse `TokenGenerator` in a non-Temporal project. Clean separation = flexibility.
+
+### Step 9: Update Maven Configuration
+
+**What are you doing?** Making it easy to run worker vs starter with different Maven commands.
+
+**Edit `pom.xml`:** Find the `exec-maven-plugin` section (around line 59). Inside the `<plugin>` block, add execution profiles:
+
+```xml
+<executions>
+    <execution>
+        <id>worker</id>
+        <configuration>
+            <mainClass>solution.temporal.WorkerApp</mainClass>
+        </configuration>
+    </execution>
+    <execution>
+        <id>workflow</id>
+        <configuration>
+            <mainClass>solution.temporal.Starter</mainClass>
+        </configuration>
+    </execution>
+</executions>
+```
+
+Now you can run:
+- `mvn compile exec:java` → baseline
+- `mvn compile exec:java@worker` → your worker
+- `mvn compile exec:java@workflow` → your starter
+
+### Step 10: Wire It All Together in WorkerApp
+
+**Go back to WorkerApp.java and complete Step 4** (remember you left a TODO there):
+
+```java
+// 3. Create business logic instances (dependency injection!)
+TokenGenerator tokenGenerator = new TokenGenerator();
+EmailSender emailSender = new EmailSender();
+
+// 4. Register workflow implementation
+worker.registerWorkflowImplementationTypes(EmailVerificationWorkflowImpl.class);
+
+// 5. Register activity implementations
+//    Wrap helpers in activity implementations, register them
+worker.registerActivitiesImplementations(
+    new TokenGeneratorActivityImpl(tokenGenerator),
+    new EmailSenderActivityImpl(emailSender)
+);
+```
+
+**What just happened?** You created instances of your helpers, wrapped them in activity implementations, and told the worker "these are the activities you can execute." When a workflow calls an activity, Temporal routes it to the registered implementation.
+
+**The final insight:** You've built a distributed, durable, retryable system and the business logic is just... normal Java. That's the power of Temporal - you write straightforward code, Temporal handles the hard parts.
+
+## Running Your Solution
+
+### Terminal 1 - Start the Worker
+
+```bash
+mvn compile exec:java@worker
+```
+
+You should see:
+```
+Worker starting on task queue: email-verification-tasks
+Worker started. Listening for workflows...
+```
+
+Keep this running!
+
+### Terminal 2 - Run the Starter
+
+```bash
+mvn compile exec:java@workflow
+```
+
+Watch the magic happen:
+- Token generation for each email
+- Email sending (with occasional retries when it fails)
+- Final results printed
+
+### Terminal 3 - Temporal UI
+
+```bash
+open http://localhost:8233
+```
+
+In the UI you'll see:
+- All 3 workflow executions
+- Click into one → see both activities in timeline
+- View Event History → see retry attempts
+- Notice token passed from activity 1 to activity 2
+
+## What to Observe
+
+### 1. Automatic Retries
+
+When email sending fails (10% of the time), watch the worker console:
+```
+Sending verification email to bob@example.com...
+Email service temporarily unavailable
+Sending verification email to bob@example.com...  (retry!)
+✓ Verification email sent to bob@example.com
+```
+
+Notice: Token is NOT regenerated - same token reused across retries!
+
+### 2. Durable Execution
+
+Try this:
+1. Start worker
+2. Start starter (triggers workflows)
+3. **Kill worker** (Ctrl+C) mid-execution
+4. Restart worker
+5. Watch workflows resume exactly where they left off!
+
+This is durable execution - your workflows survive process crashes.
+
+### 3. Temporal UI Insights
+
+In http://localhost:8233, find a workflow that had retries:
+- Event History shows: `ActivityTaskScheduled` → `ActivityTaskFailed` → `ActivityTaskScheduled` (retry!) → `ActivityTaskCompleted`
+- Input/Output tab shows the token passed between activities
+- Timeline shows visual execution flow
+
+## Success Criteria
+
+✅ Worker starts without errors
+✅ All 3 workflows complete successfully
+✅ Automatic retries visible when email fails
+✅ No manual retry logic in your code
+✅ Can complete in **30-45 minutes**
+
+## Mental Model Shift
+
+**Before Temporal:**
+```
+Email fails → Entire process fails → Start over → Generate new token → Try again
+```
+
+**After Temporal:**
+```
+Email fails → Temporal retries just that step → Same token → Eventually succeeds
+Process crashes → Temporal resumes from last checkpoint → No work lost
+```
+
+You're not writing retry logic. You're declaring **what should happen**, and Temporal makes it durable and resilient.
+
+## Common Issues
+
+**"Worker won't start"**
+- Make sure Temporal server is running: `temporal server start-dev`
+- Check Java version: `java -version` (should be 11+)
+
+**"Workflow not executing"**
+- Is worker running in Terminal 1?
+- Check task queue names match in Worker and Starter
+
+**"Can't see workflows in UI"**
+- Open http://localhost:8233 (not :8233/)
+- Click "Workflows" in left sidebar
+- Filter by status if needed
+
+**"Activity not retrying"**
+- Check ActivityOptions includes RetryOptions
+- Verify maximumAttempts is > 1
+
+## What You've Learned
+
+By building this backwards, you now understand:
+
+1. **Workflow = Orchestration**: Calls activities, passes data, handles results
+2. **Activities = Work**: Where non-deterministic operations happen
+3. **Worker = Executor**: Runs workflows and activities
+4. **Starter = Trigger**: Initiates workflow executions
+5. **Temporal = Reliability**: Handles retries, durability, visibility automatically
+
+You've practiced the exact pattern you'll use for every Temporal application. Next time, you'll build it even faster!
