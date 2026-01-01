@@ -4,7 +4,7 @@ import solution.domain.RegistrationResult;
 import solution.domain.User;
 
 public class VerificationEmailActivityImpl implements VerificationEmailActivity{
-    private EmailService emailService;
+    private final EmailService emailService;
 
     public VerificationEmailActivityImpl(EmailService emailService) {
         this.emailService = emailService;
