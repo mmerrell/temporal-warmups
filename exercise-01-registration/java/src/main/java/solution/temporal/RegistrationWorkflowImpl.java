@@ -69,7 +69,7 @@ public class RegistrationWorkflowImpl implements RegistrationWorkflow{
             System.out.println(separator + "\n");
 
             userValidatorActivity.validateUserData(user);
-            String userId =createUserRecordActivity.createUserRecord(user);
+            String userId = createUserRecordActivity.createUserRecord(user);
             RegistrationResult result = new RegistrationResult(true, userId, null, null);
             Email theEmail = new Email(user.email, user.username);
             welcomeEmailActivity.sendWelcomeEmail(theEmail);
