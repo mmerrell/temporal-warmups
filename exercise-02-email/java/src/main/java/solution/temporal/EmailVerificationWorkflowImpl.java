@@ -11,11 +11,12 @@ import java.time.Duration;
 public class EmailVerificationWorkflowImpl implements EmailVerificationWorkflow{
     //1. configure options
     private static final ActivityOptions ACTIVITY_OPTIONS = ActivityOptions.newBuilder()
-            .setStartToCloseTimeout(Duration.ofMinutes(30))
+            .setStartToCloseTimeout(Duration.ofSeconds(20))
             .setRetryOptions(RetryOptions.newBuilder()
 //                    .setMaximumAttempts(3)    //not common to set this
                     .setInitialInterval(Duration.ofSeconds(1))
                     .setMaximumInterval(Duration.ofSeconds(10))
+                    .setBackoffCoefficient(2.0)
                     .build())
             .build();
 
@@ -31,24 +32,24 @@ public class EmailVerificationWorkflowImpl implements EmailVerificationWorkflow{
 
     @Override
     public VerificationResult verifyEmail(String email) {
-        String separator = "==================================================";
-        System.out.println("\n" + separator);
-        System.out.println("Starting verification for " + email);
-        System.out.println(separator + "\n");
+        Workflow.getLogger(EmailVerificationWorkflowImpl.class)
+                .info("Starting email verification for " + email);
 
         try {
+            // Step 1: Generate token (activity call)
             String token = tokenGenerationActivity.generateToken(email);
-            String link = emailSendingActivity.sendVerificationEmail(email, token);
 
-            System.out.println("\n" + separator);
-            System.out.println("✓ Verification initiated for " + email);
-            System.out.println(separator + "\n");
+            // Step 2: Send email with that token (activity call)
+            String verificationLink = emailSendingActivity.sendVerificationEmail(email, token);
 
-            return new VerificationResult(true, email, token, link);
+            Workflow.getLogger(EmailVerificationWorkflowImpl.class)
+                    .info("✓ Verification complete for " + email);
+
+            return new VerificationResult(true, email, token, verificationLink);
+
         } catch (Exception e) {
-            System.out.println("\n" + separator);
-            System.out.println("✗ Verification failed for " + email + ": " + e.getMessage());
-            System.out.println(separator + "\n");
+            Workflow.getLogger(EmailVerificationWorkflowImpl.class)
+                    .error("✗ Verification failed for " + email + ": " + e.getMessage());
 
             VerificationResult result = new VerificationResult();
             result.success = false;

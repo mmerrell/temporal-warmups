@@ -22,6 +22,8 @@ public class EmailVerifier {
 
         System.out.println("✓ Verification email sent to " + email);
         System.out.println("  Link: " + verificationLink.substring(0, 50) + "...");
+        sleep(10000);
+
         return verificationLink;
     }
 

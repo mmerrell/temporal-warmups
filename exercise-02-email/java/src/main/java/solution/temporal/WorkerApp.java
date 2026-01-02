@@ -10,6 +10,7 @@ public class WorkerApp {
     private static final String TASK_QUEUE = "email-verification";
 
     //2. build out the main()
+    // We will register workflow and activity Impls
     public static void main(String[] args) {
         //1. connect to temporal - create a service and client
         WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
@@ -20,6 +21,7 @@ public class WorkerApp {
         Worker worker = factory.newWorker(TASK_QUEUE);
 
         // 3. Tell the worker what workflows it can execute
+        // registering and Impl
         worker.registerWorkflowImplementationTypes(EmailVerificationWorkflowImpl.class);
 
         // 3. Create business logic instances (dependency injection!)
@@ -28,11 +30,11 @@ public class WorkerApp {
 
         // 4. Tell the worker what activities it can execute by registering
         // pass in the business logic objects
+        // registering and Impl
         worker.registerActivitiesImplementations(new EmailSendingActivityImpl(emailSender),
         new TokenGenerationActivityImpl(tokenGenerator));
 
         // 5. Start the worker - it runs forever, polling for tasks
         factory.start();
-
     }
 }

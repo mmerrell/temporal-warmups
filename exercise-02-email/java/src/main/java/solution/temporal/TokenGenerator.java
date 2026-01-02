@@ -1,6 +1,7 @@
 package solution.temporal;
 
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.util.Base64;
 
 public class TokenGenerator {
@@ -13,6 +14,7 @@ public class TokenGenerator {
         byte[] randomBytes = new byte[32];
         secureRandom.nextBytes(randomBytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+        sleep(10000);
 
         System.out.println("✓ Token generated: " + token.substring(0, 16) + "...");
         return token;
