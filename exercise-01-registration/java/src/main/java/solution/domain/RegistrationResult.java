@@ -7,7 +7,7 @@ public class RegistrationResult {
     public boolean success;
     public String userId;
     public String verificationToken;
-    String error;
+    public String error;
 
     public RegistrationResult() {
     }
