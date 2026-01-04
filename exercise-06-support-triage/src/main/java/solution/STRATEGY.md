@@ -14,6 +14,14 @@ The activities here include:
 
 ## 2. Workflow
 
+```
+Activity 1 (PII Scrubber) → returns scrubbed text
+                         ↓
+Activity 2 (Classifier) → takes scrubbed text, returns classification
+                         ↓
+Workflow Logic → makes routing decision (needs human review?)
+```
+
 1. `String scrubbedText = scrubPII(ticketText);`
 2. `TicketClassification classification = classifyTicket(scrubbedText);`
 3. `boolean needsHumanReview =
