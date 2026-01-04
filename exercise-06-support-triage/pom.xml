@@ -71,6 +71,22 @@
                     <!-- Default: run pre-temporal baseline -->
                     <mainClass>exercise.SupportTriageService</mainClass>
                 </configuration>
+<!--                Add an <execution> to run workflow and worker
+                    If we keep the same class names, it's just a copy and paste -->
+                <executions>
+                    <execution>
+                        <id>worker</id>
+                        <configuration>
+                            <mainClass>solution.temporal.WorkerApp</mainClass>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>workflow</id>
+                        <configuration>
+                            <mainClass>solution.temporal.Starter</mainClass>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

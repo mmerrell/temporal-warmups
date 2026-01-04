@@ -149,18 +149,19 @@ public class SupportTriageService {
         String reasoning = "";
 
         for (String line : response.split("\n")) {
+            String trim = line.substring(line.indexOf(":") + 1).trim();
             if (line.toLowerCase().startsWith("category:")) {
-                category = line.substring(line.indexOf(":") + 1).trim().toLowerCase();
+                category = trim.toLowerCase();
             } else if (line.toLowerCase().startsWith("urgency:")) {
-                urgency = line.substring(line.indexOf(":") + 1).trim().toLowerCase();
+                urgency = trim.toLowerCase();
             } else if (line.toLowerCase().startsWith("confidence:")) {
                 try {
-                    confidence = Double.parseDouble(line.substring(line.indexOf(":") + 1).trim());
+                    confidence = Double.parseDouble(trim);
                 } catch (NumberFormatException e) {
                     confidence = 0.5;
                 }
             } else if (line.toLowerCase().startsWith("reasoning:")) {
-                reasoning = line.substring(line.indexOf(":") + 1).trim();
+                reasoning = trim;
             }
         }
 

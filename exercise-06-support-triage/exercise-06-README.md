@@ -155,7 +155,37 @@ RetryOptions.newBuilder()
 4. External system sends signal: `workflow.approveTicket()`
 5. Workflow resumes and creates CRM case
 
-**Signal Definition** (in workflow interface):
+---
+
+## Understanding Signals (NEW CONCEPT)
+
+**What is a Signal?**
+
+A signal is a way for external code to send data INTO a running workflow. Think of it as a message delivery mechanism:
+- **Workflow** = recipient waiting for mail
+- **Signal** = mailbox where messages arrive
+- **External code** = sender dropping off mail
+
+**Why Use Signals?**
+
+Signals enable workflows to pause and wait for external events:
+- Human approval/rejection
+- External system notifications
+- User input or decisions
+- Real-time updates from other systems
+
+**Key Characteristics:**
+- **Asynchronous**: Sending a signal doesn't block the sender
+- **Durable**: Signals are persisted by Temporal
+- **Fire-and-forget**: You can send signals even if workflow hasn't reached the await yet
+- **Ordered**: Signals are processed in the order received
+
+---
+
+### Signal Implementation: Complete Pattern
+
+#### Step 1: Define the Signal Method in Your Workflow Interface
+
 ```java
 @WorkflowInterface
 public interface SupportTriageWorkflow {
@@ -163,20 +193,301 @@ public interface SupportTriageWorkflow {
     TriageResult triageTicket(String ticketId, String ticketText);
 
     @SignalMethod
-    void approveTicket(boolean approved);
+    void approveTicket(boolean approved);  // Signal can pass data
 }
 ```
 
-**Signal Wait** (in workflow implementation):
-```java
-if (needsHumanReview) {
-    // Wait for human approval (workflow pauses here)
-    Workflow.await(() -> approvalReceived);
+**Key Points:**
+- `@SignalMethod` annotation marks this as a signal receiver
+- Signal methods must return `void` (they don't return values to sender)
+- Signal methods can take parameters (data from sender)
+- You can have multiple signal methods in one workflow
 
-    if (!approved) {
-        return new TriageResult(false, "Rejected by human reviewer");
+#### Step 2: Track Signal State in Your Workflow Implementation
+
+**CRITICAL**: You need workflow state to track whether signal was received!
+
+```java
+public class SupportTriageWorkflowImpl implements SupportTriageWorkflow {
+    // State fields to track signal
+    private boolean approvalReceived = false;  // Has signal arrived?
+    private boolean approved = false;           // What was the decision?
+
+    @Override
+    public TriageResult triageTicket(String ticketId, String ticketText) {
+        // ... PII scrubbing and classification ...
+
+        boolean needsHumanReview =
+            classification.confidence < 0.7 ||
+            classification.urgency.equals("critical");
+
+        if (needsHumanReview) {
+            Workflow.getLogger(SupportTriageWorkflowImpl.class)
+                .info("Ticket needs human review. Waiting for approval signal...");
+
+            // Wait for signal with timeout
+            boolean signalReceived = Workflow.await(
+                Duration.ofHours(24),           // Timeout after 24 hours
+                () -> approvalReceived          // Condition to check
+            );
+
+            if (!signalReceived) {
+                // Timeout - no human responded
+                return new TriageResult(false, ticketId, null, null,
+                    "Timeout: No approval received within 24 hours", false);
+            }
+
+            if (!approved) {
+                // Human rejected the ticket
+                return new TriageResult(false, ticketId, null, null,
+                    "Rejected by human reviewer", false);
+            }
+
+            Workflow.getLogger(SupportTriageWorkflowImpl.class)
+                .info("Ticket approved by human reviewer");
+        }
+
+        // Continue with CRM case creation
+        String caseId = "CASE-" + Workflow.currentTimeMillis();
+        // ... rest of logic ...
+    }
+
+    @Override
+    public void approveTicket(boolean approved) {
+        // This method is called when signal is received
+        this.approved = approved;           // Store the decision
+        this.approvalReceived = true;       // Mark that signal arrived
+
+        Workflow.getLogger(SupportTriageWorkflowImpl.class)
+            .info("Approval signal received: " + approved);
     }
 }
+```
+
+**Common Mistakes:**
+- ❌ Forgetting state fields (`approvalReceived`, `approved`)
+- ❌ Not setting `approvalReceived = true` in signal handler
+- ❌ Using `Workflow.await()` without timeout (workflow waits forever!)
+- ❌ Returning values from signal methods (signals are void)
+
+#### Step 3: Send Signal from Client Code
+
+**Pattern 1: Get existing workflow stub by ID**
+```java
+// You need the workflow ID from when you started it
+String workflowId = "support-triage-abc123";
+
+// Create stub pointing to existing workflow
+SupportTriageWorkflow workflow = client.newWorkflowStub(
+    SupportTriageWorkflow.class,
+    workflowId  // Connect to specific running workflow
+);
+
+// Send signal (non-blocking call)
+workflow.approveTicket(true);  // Approve
+// or
+workflow.approveTicket(false); // Reject
+```
+
+**Pattern 2: Store workflow stub when you start workflow**
+```java
+// When starting workflow, keep the stub
+SupportTriageWorkflow workflow = client.newWorkflowStub(
+    SupportTriageWorkflow.class,
+    WorkflowOptions.newBuilder()
+        .setTaskQueue(TASK_QUEUE)
+        .setWorkflowId(workflowId)
+        .build()
+);
+
+// Start workflow async
+WorkflowClient.start(workflow::triageTicket, ticketId, ticketText);
+
+// Later, send signal using same stub
+Thread.sleep(5000);  // Simulate waiting for human decision
+workflow.approveTicket(true);
+```
+
+**Pattern 3: Send signal from separate process**
+```java
+// In a separate admin tool or web service
+public void approveTicket(String workflowId, boolean approved) {
+    WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
+    WorkflowClient client = WorkflowClient.newInstance(service);
+
+    SupportTriageWorkflow workflow = client.newWorkflowStub(
+        SupportTriageWorkflow.class,
+        workflowId
+    );
+
+    workflow.approveTicket(approved);
+}
+```
+
+**Pattern 4: Send signal via Temporal CLI** ⭐ **EASIEST FOR TESTING**
+```bash
+# Find your workflow ID first (check worker/client output or Temporal UI)
+# Format: temporal workflow signal --workflow-id <ID> --name <SIGNAL_NAME> --input <JSON>
+
+# Approve the ticket
+temporal workflow signal \
+  --workflow-id support-triage-abc123 \
+  --name approveTicket \
+  --input true
+
+# Reject the ticket
+temporal workflow signal \
+  --workflow-id support-triage-abc123 \
+  --name approveTicket \
+  --input false
+```
+
+**Tips for CLI usage:**
+- Signal name matches the method name in your `@SignalMethod` (e.g., `approveTicket`)
+- Input is JSON format - for boolean, just use `true` or `false`
+- For complex objects, use JSON: `--input '{"fieldName": "value"}'`
+- You can find workflow IDs in the Temporal UI or from your client output
+
+**Finding workflow IDs:**
+```bash
+# List all running workflows
+temporal workflow list
+
+# List workflows filtered by task queue
+temporal workflow list --query 'TaskQueue="support-triage"'
+
+# Show details of a specific workflow (includes current state)
+temporal workflow describe --workflow-id support-triage-abc123
+```
+
+---
+
+### Signal Timing: When Does the Signal Arrive?
+
+**Important**: Signals can arrive BEFORE the workflow reaches `Workflow.await()`!
+
+**Scenario 1: Signal arrives early**
+```
+Time 0: Workflow starts
+Time 1: Signal sent (approveTicket called)
+Time 2: Workflow reaches Workflow.await()
+Result: await() immediately returns true (signal already received)
+```
+
+**Scenario 2: Signal arrives during wait**
+```
+Time 0: Workflow starts
+Time 1: Workflow reaches Workflow.await() and pauses
+Time 2: Signal sent (approveTicket called)
+Result: await() wakes up and returns true
+```
+
+**Scenario 3: Timeout**
+```
+Time 0: Workflow starts
+Time 1: Workflow reaches Workflow.await(Duration.ofHours(24), ...)
+Time 2-24h: No signal received
+Time 24h: await() returns false (timeout)
+```
+
+**This is why we use state fields** (`approvalReceived`) - they persist the signal data!
+
+---
+
+### Debugging Signals
+
+**How to check if signal was received:**
+
+1. **Temporal UI** (http://localhost:8233)
+   - Open your workflow execution
+   - Look for `WorkflowSignaled` event in Event History
+   - See signal name and payload
+
+2. **Workflow logs**
+   ```java
+   Workflow.getLogger(SupportTriageWorkflowImpl.class)
+       .info("Waiting for signal...");
+   ```
+
+3. **Client-side logging**
+   ```java
+   System.out.println("Sending approval signal to workflow: " + workflowId);
+   workflow.approveTicket(true);
+   System.out.println("Signal sent successfully");
+   ```
+
+---
+
+### Testing Your Signal Implementation
+
+**Test 1: Happy Path with Approval** ⭐ **Try this with CLI!**
+```bash
+# Terminal 1: Start your worker
+mvn compile exec:java -Dexec.mainClass="solution.temporal.WorkerApp"
+
+# Terminal 2: Start workflow with your client
+mvn compile exec:java -Dexec.mainClass="solution.temporal.Starter"
+
+# Terminal 3: Send approval signal (copy workflow ID from Terminal 2 output)
+temporal workflow signal \
+  --workflow-id support-triage-<YOUR-ID> \
+  --name approveTicket \
+  --input true
+```
+
+Alternatively, in Java code:
+```java
+// Start workflow with high-risk ticket
+WorkflowClient.start(workflow::triageTicket, "TKT-001", "URGENT: System down!");
+
+// Wait a bit
+Thread.sleep(2000);
+
+// Send approval
+workflow.approveTicket(true);
+
+// Workflow should complete successfully
+```
+
+**Test 2: Rejection via CLI**
+```bash
+# After starting workflow in Terminal 2, send rejection:
+temporal workflow signal \
+  --workflow-id support-triage-<YOUR-ID> \
+  --name approveTicket \
+  --input false
+```
+
+Or in Java:
+```java
+WorkflowClient.start(workflow::triageTicket, "TKT-002", "Low priority issue");
+Thread.sleep(2000);
+workflow.approveTicket(false);  // Reject
+// Workflow should return failure result
+```
+
+**Test 3: Timeout**
+```java
+// Start workflow with short timeout
+// In workflow: Workflow.await(Duration.ofSeconds(5), ...)
+WorkflowClient.start(workflow::triageTicket, "TKT-003", "Test timeout");
+// Don't send signal
+Thread.sleep(10000);  // Wait past timeout
+// Workflow should timeout and handle it gracefully
+```
+
+**Test 4: Signal Before Await**
+```bash
+# Start workflow and IMMEDIATELY send signal (before it reaches await)
+# Terminal 2: Start workflow
+mvn compile exec:java -Dexec.mainClass="solution.temporal.Starter"
+
+# Terminal 3: Send signal RIGHT AWAY (don't wait)
+temporal workflow signal \
+  --workflow-id support-triage-<YOUR-ID> \
+  --name approveTicket \
+  --input true
+# Workflow should still receive it when it reaches await!
 ```
 
 This is a **powerful pattern** for compliance, risk management, and complex approvals!
@@ -386,8 +697,11 @@ private final PIIScrubberActivity piiScrubber =
     Workflow.newActivityStub(PIIScrubberActivity.class, options);
 ```
 
-### Signal Definition
+### Signal Quick Reference
 
+**See "Understanding Signals (NEW CONCEPT)" section above for complete tutorial!**
+
+**Define Signal in Interface:**
 ```java
 @WorkflowInterface
 public interface SupportTriageWorkflow {
@@ -395,27 +709,39 @@ public interface SupportTriageWorkflow {
     TriageResult triageTicket(String ticketId, String ticketText);
 
     @SignalMethod
-    void approveTicket(boolean approved);
+    void approveTicket(boolean approved);  // Must return void
 }
 ```
 
-### Signal Wait with Timeout
-
+**Track State in Workflow Implementation:**
 ```java
-// In workflow implementation
+public class SupportTriageWorkflowImpl implements SupportTriageWorkflow {
+    private boolean approvalReceived = false;  // CRITICAL: Track if signal arrived
+    private boolean approved = false;
+
+    @Override
+    public void approveTicket(boolean approved) {
+        this.approved = approved;
+        this.approvalReceived = true;  // Don't forget this!
+    }
+}
+```
+
+**Wait for Signal with Timeout:**
+```java
+// In workflow method
 boolean signalReceived = Workflow.await(
-    Duration.ofHours(24),
-    () -> approvalReceived
+    Duration.ofHours(24),           // Timeout
+    () -> approvalReceived          // Condition
 );
 
 if (!signalReceived) {
-    // Timeout - auto-reject or escalate
+    // Handle timeout
     return new TriageResult(false, "Timeout waiting for approval");
 }
 ```
 
-### Sending Signal from Client
-
+**Send Signal from Client:**
 ```java
 // Get workflow stub by ID
 SupportTriageWorkflow workflow = client.newWorkflowStub(
@@ -423,7 +749,7 @@ SupportTriageWorkflow workflow = client.newWorkflowStub(
     workflowId
 );
 
-// Send approval signal
+// Send approval signal (non-blocking)
 workflow.approveTicket(true);
 ```
 
