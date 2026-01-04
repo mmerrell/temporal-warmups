@@ -37,3 +37,18 @@ Output:
 
 ## 3. There's a for loop for the tickets, where does that go?
 Into `Starter.java` that passes the information into the workflow, which will take in the `ticketText` and then follow the steps
+
+## 4. Create the Starter using 8-step process
+
+1. create a task queue name
+2. create a main()
+3. connect to temporal server just like in the Worker
+4. create a for loop to iterate over the tickets
+5. create unique workflowId
+6. create Workflow stub using `client.newWorkflowStub()`
+7. run the workflow
+8. process results
+
+   
+
+
