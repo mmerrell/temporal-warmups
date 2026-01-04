@@ -49,6 +49,9 @@ Into `Starter.java` that passes the information into the workflow, which will ta
 7. run the workflow
 8. process results
 
+## 5. Create Worker
+
+This is the more involved step. It will require creating the `ActivityImpl` and the business logic objects.
    
 
 
