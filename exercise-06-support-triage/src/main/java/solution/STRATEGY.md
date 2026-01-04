@@ -52,6 +52,43 @@ Into `Starter.java` that passes the information into the workflow, which will ta
 ## 5. Create Worker
 
 This is the more involved step. It will require creating the `ActivityImpl` and the business logic objects.
+
+## 6. Update POM.xml for simple CLI execution
+
+Add this to the POM.xml.
+
+💡 If we keep the same class names then we can just do a simple copy and paste
+
+```xml
+            <!-- Exec plugin for running main classes -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+                <configuration>
+                    <!-- Default: run pre-temporal baseline -->
+                    <mainClass>exercise.SupportTriageService</mainClass>
+                </configuration>
+<!--                Add an <execution> to run workflow and worker
+                    If we keep the same class names, it's just a copy and paste -->
+                <executions>
+                    <execution>
+                        <id>worker</id>
+                        <configuration>
+                            <mainClass>solution.temporal.WorkerApp</mainClass>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>workflow</id>
+                        <configuration>
+                            <mainClass>solution.temporal.Starter</mainClass>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+
+```
    
 
 
