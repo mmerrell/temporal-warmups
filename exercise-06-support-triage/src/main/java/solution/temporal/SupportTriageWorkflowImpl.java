@@ -45,37 +45,30 @@ public class SupportTriageWorkflowImpl implements SupportTriageWorkflow {
             // Step 2: Classify ticket
             TicketClassification classification = classifier.classifyTicket(scrubbedText);
 
-            // Step 3: Route decision (deterministic logic)
-            boolean needsHumanReview =
-                    classification.confidence < 0.7 ||
-                            classification.urgency.equals("critical");
+            // Step 3: Human in the loop
+            Workflow.getLogger(SupportTriageWorkflowImpl.class)
+                    .info("Ticket needs human review. Waiting for approval signal...");
 
-            if (needsHumanReview) {
-                Workflow.getLogger(SupportTriageWorkflowImpl.class)
-                        .info("Ticket needs human review. Waiting for approval signal...");
+            // Wait for signal with timeout
+            boolean signalReceived = Workflow.await(
+                    Duration.ofHours(24),           // Timeout after 24 hours
+                    () -> approvalReceived          // Condition to check
+            );
 
-                // Wait for signal with timeout
-                boolean signalReceived = Workflow.await(
-                        Duration.ofHours(24),           // Timeout after 24 hours
-                        () -> approvalReceived          // Condition to check
-                );
-
-                if (!signalReceived) {
-                    // Timeout - no human responded
-                    return new TriageResult(false, ticketId, null, null,
-                            "Timeout: No approval received within 24 hours", false);
-                }
-
-                if (!approved) {
-                    // Human rejected the ticket
-                    return new TriageResult(false, ticketId, null, null,
-                            "Rejected by human reviewer", false);
-                }
-
-                Workflow.getLogger(SupportTriageWorkflowImpl.class)
-                        .info("Ticket approved by human reviewer");
-
+            if (!signalReceived) {
+                // Timeout - no human responded
+                return new TriageResult(false, ticketId, null, null,
+                        "Timeout: No approval received within 24 hours", false);
             }
+
+            if (!approved) {
+                // Human rejected the ticket
+                return new TriageResult(false, ticketId, null, null,
+                        "Rejected by human reviewer", false);
+            }
+
+            Workflow.getLogger(SupportTriageWorkflowImpl.class)
+                    .info("Ticket approved by human reviewer");
 
             // Step 4: Create CRM case (simulated)
             String caseId = "CASE-" + System.currentTimeMillis();
@@ -85,7 +78,7 @@ public class SupportTriageWorkflowImpl implements SupportTriageWorkflow {
             System.out.println("✓ Ticket " + ticketId + " processed successfully");
             System.out.println(separator);
 
-            return new TriageResult(true, ticketId, classification, caseId, null, needsHumanReview);
+            return new TriageResult(true, ticketId, classification, caseId, null, true);
 
         } catch (Exception e) {
             System.out.println("\n" + separator);
