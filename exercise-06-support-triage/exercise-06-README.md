@@ -5,8 +5,11 @@
 You have an AI-powered customer support triage system that coordinates multiple LLM agents:
 1. **PII Scrubbing Agent** - Uses GPT-4 to redact sensitive information (credit cards, SSNs, emails)
 2. **Classification Agent** - Uses GPT-4 to categorize and assess urgency
+3. New usage of `@SignalQuery` for Human-in-the-loop scenarios
 
 The system routes high-risk or low-confidence tickets to human review, while auto-processing low-risk tickets. This is a realistic use case for Temporal customers building **multi-agent AI orchestration** with **human-in-the-loop** approval.
+
+![signal](src/main/java/solution/temporal/signal-image.png)
 
 ## Run the Pre-Temporal Baseline
 
@@ -15,7 +18,6 @@ The system routes high-risk or low-confidence tickets to human review, while aut
 1. **Get OpenAI API Key**:
    - Sign up at https://platform.openai.com
    - Create an API key
-   - Cost estimate: ~$0.02-0.05 per ticket (2 GPT-4 calls)
 
 2. **Set environment variable**:
    ```bash
@@ -96,6 +98,8 @@ If you completed Exercises 01-02, you learned about:
 ### Key Concepts to Apply
 
 #### 1. Separating Non-Deterministic AI Operations
+
+[Strategy.md](solution/STRATEGY.md) has steps you might want to consider following.
 
 **Workflow code** must be deterministic:
 - Same inputs always produce same outputs
@@ -217,11 +221,6 @@ public class SupportTriageWorkflowImpl implements SupportTriageWorkflow {
     public TriageResult triageTicket(String ticketId, String ticketText) {
         // ... PII scrubbing and classification ...
 
-        boolean needsHumanReview =
-            classification.confidence < 0.7 ||
-            classification.urgency.equals("critical");
-
-        if (needsHumanReview) {
             Workflow.getLogger(SupportTriageWorkflowImpl.class)
                 .info("Ticket needs human review. Waiting for approval signal...");
 
@@ -250,7 +249,6 @@ public class SupportTriageWorkflowImpl implements SupportTriageWorkflow {
         // Continue with CRM case creation
         String caseId = "CASE-" + Workflow.currentTimeMillis();
         // ... rest of logic ...
-    }
 
     @Override
     public void approveTicket(boolean approved) {
@@ -272,62 +270,11 @@ public class SupportTriageWorkflowImpl implements SupportTriageWorkflow {
 
 #### Step 3: Send Signal from Client Code
 
-**Pattern 1: Get existing workflow stub by ID**
-```java
-// You need the workflow ID from when you started it
-String workflowId = "support-triage-abc123";
-
-// Create stub pointing to existing workflow
-SupportTriageWorkflow workflow = client.newWorkflowStub(
-    SupportTriageWorkflow.class,
-    workflowId  // Connect to specific running workflow
-);
-
-// Send signal (non-blocking call)
-workflow.approveTicket(true);  // Approve
-// or
-workflow.approveTicket(false); // Reject
-```
-
-**Pattern 2: Store workflow stub when you start workflow**
-```java
-// When starting workflow, keep the stub
-SupportTriageWorkflow workflow = client.newWorkflowStub(
-    SupportTriageWorkflow.class,
-    WorkflowOptions.newBuilder()
-        .setTaskQueue(TASK_QUEUE)
-        .setWorkflowId(workflowId)
-        .build()
-);
-
-// Start workflow async
-WorkflowClient.start(workflow::triageTicket, ticketId, ticketText);
-
-// Later, send signal using same stub
-Thread.sleep(5000);  // Simulate waiting for human decision
-workflow.approveTicket(true);
-```
-
-**Pattern 3: Send signal from separate process**
-```java
-// In a separate admin tool or web service
-public void approveTicket(String workflowId, boolean approved) {
-    WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
-    WorkflowClient client = WorkflowClient.newInstance(service);
-
-    SupportTriageWorkflow workflow = client.newWorkflowStub(
-        SupportTriageWorkflow.class,
-        workflowId
-    );
-
-    workflow.approveTicket(approved);
-}
-```
-
 **Pattern 4: Send signal via Temporal CLI** ⭐ **EASIEST FOR TESTING**
 ```bash
 # Find your workflow ID first (check worker/client output or Temporal UI)
-# Format: temporal workflow signal --workflow-id <ID> --name <SIGNAL_NAME> --input <JSON>
+# List workflows filtered by task queue
+temporal workflow list --query 'TaskQueue="support-triage"'
 
 # Approve the ticket
 temporal workflow signal \
@@ -365,6 +312,8 @@ temporal workflow describe --workflow-id support-triage-abc123
 ### Signal Timing: When Does the Signal Arrive?
 
 **Important**: Signals can arrive BEFORE the workflow reaches `Workflow.await()`!
+
+**Important**: Signal must arrive before the workflow finishes!
 
 **Scenario 1: Signal arrives early**
 ```
