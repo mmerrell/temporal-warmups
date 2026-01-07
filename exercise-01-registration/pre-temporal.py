@@ -1,9 +1,6 @@
 # registration_service.py
 import time
 import random
-import smtplib
-from email.mime.text import MIMEText
-
 
 class RegistrationService:
     def __init__(self):
