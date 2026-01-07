@@ -63,7 +63,7 @@ temporal-warmups/
 ├── exercise-03-hotel/           # Messy code refactoring, fallback patterns
 ├── exercise-04-registration-java/  # Java implementation
 ├── exercise-05-booking/         # Saga/compensation patterns
-├── exercise-06-greatwall/       # (In development)
+├── exercise-06-support-triage/  # Multi-agent AI, Signals (NEW!), Human-in-the-loop
 ├── exercise-07-distilled/       # (In development)
 └── temporal-warmups-curriculum.md  # Full curriculum with learning objectives
 ```
@@ -210,14 +210,15 @@ price: float    # 99.99
 **Week 3-4 (Real-World Patterns):**
 - Exercise #3 (Hotel) - Messy code refactoring, fallback patterns
 - Exercise #5 (Booking) - Saga/compensation patterns
-- Exercise #6 (Great Wall) - Parallel execution (fan-out/fan-in)
+- Exercise #6 (Support Triage) - **Signals (first introduction!)**, human-in-the-loop, multi-agent AI
 
 **Week 5+ (Advanced):**
-- Signals & queries
+- Queries (read workflow state)
 - Parent-child workflows
 - Workflow versioning
 - Continue-as-new
 - Performance tuning
+- Parallel execution (fan-out/fan-in)
 
 ## Important Notes
 
@@ -239,6 +240,14 @@ price: float    # 99.99
   - Workflow code must be deterministic (same inputs → same outputs)
   - Never use `time.time()`, `random.random()`, `datetime.now()` in workflows
   - Use `workflow.now()`, `workflow.uuid4()` instead
+
+- **Signals (Introduced in Exercise #6):**
+  - Signals allow external code to send data INTO a running workflow
+  - Use signals for human approvals, external notifications, or real-time updates
+  - Signal methods must return `void` in Java (`None` in Python)
+  - Always use `Workflow.await()` with a timeout to avoid infinite waits
+  - Track signal state with workflow instance fields (e.g., `approvalReceived = false`)
+  - Signals are durable - Temporal persists them even if workflow hasn't reached the await yet
 
 ## Testing & Development
 

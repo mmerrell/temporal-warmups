@@ -31,9 +31,9 @@ Each exercise includes:
 - Focus: Real-world challenges
 
 **Week 5+: Advanced Patterns**
+- **Signals and queries** (introduced in Exercise 06)
 - Parallel execution (fan-out/fan-in)
 - Parent-child workflows
-- Signals and queries
 - Workflow versioning
 - Continue-as-new
 - Focus: Production patterns
@@ -55,8 +55,16 @@ temporal-warmups/
 │   ├── java/                      # Java solution
 │   ├── go/                        # Go solution
 │   └── typescript/                # TypeScript solution
-├── exercise-02-[name]/
-├── exercise-03-[name]/
+├── exercise-02-email/            # Email verification
+├── exercise-02-orders/           # Order processing
+├── exercise-03-hotel/            # Hotel booking with fallbacks
+├── exercise-04-registration-java/ # Java-specific registration
+├── exercise-05-booking/          # Travel booking (sagas)
+├── exercise-06-support-triage/   # ⭐ AI support triage (SIGNALS!)
+│   ├── exercise-06-README.md      # @Signal and OpenAI Java SDK
+│   └── src/main/java/
+│       ├── exercise/              # Pre-Temporal baseline
+│       └── solution/temporal/     # Temporal solution with signals
 └── README.md
 ```
 
@@ -92,6 +100,27 @@ Each exercise contains language-specific instructions in its README. General pat
 6. **Run the client** (in another terminal)
 7. **Check Temporal UI** at http://localhost:8233
 
+## 🆕 What's New in Exercise 06
+
+**Exercise 06 - Support Triage** introduces **Signals** for the first time in this curriculum!
+
+### New Concepts:
+- **`@SignalMethod`** (Java) - Define signal handlers in workflows
+- **Human-in-the-loop patterns** - Workflows pause for external approval
+- **Signal timing** - Understanding when signals arrive vs when workflow reaches `await()`
+- **Sending signals via CLI** - `temporal workflow signal` commands for testing
+- **Multi-agent AI orchestration** - Coordinating multiple LLM API calls with Temporal
+- **State tracking in workflows** - Using instance fields to track signal receipt
+
+### Why This Matters:
+Signals enable workflows to pause and wait for external events like:
+- Human approvals (compliance, risk management)
+- External system notifications
+- User input or decisions
+- Real-time updates from other services
+
+This is a **production-critical pattern** for building reliable, auditable systems with human oversight.
+
 ## 📖 Learning Approach
 
 ### Daily Practice
@@ -113,7 +142,10 @@ Each exercise contains language-specific instructions in its README. General pat
 - State management and durability
 - Compensation patterns (sagas)
 - Parallel execution patterns
-- Signals and queries
+- **Signals and queries** ⭐ **NEW in Exercise 06!**
+  - Human-in-the-loop approvals
+  - External events triggering workflow state changes
+  - Sending signals via Java client code or Temporal CLI
 - Workflow versioning
 
 ## 🎓 Context
@@ -142,9 +174,13 @@ These exercises are part of a larger learning journey to:
 
 | Exercise | Python | Java | Go | TypeScript | Concepts |
 |----------|--------|------|----|-----------| ---------|
-| 01 - Registration | ✅ | ⬜ | ⬜ | ⬜ | Basic workflow, activities, retries |
-| 02 - [TBD] | ⬜ | ⬜ | ⬜ | ⬜ | [TBD] |
-| 03 - [TBD] | ⬜ | ⬜ | ⬜ | ⬜ | [TBD] |
+| 01 - Registration | ✅ | ✅ | ⬜ | ⬜ | Basic workflow, activities, retries |
+| 02 - Email Verification | ✅ | ✅ | ⬜ | ⬜ | Muscle memory building |
+| 02 - Order Processing | ✅ | ⬜ | ⬜ | ⬜ | Multiple activities, external state |
+| 03 - Hotel Booking | ✅ | ⬜ | ⬜ | ⬜ | Messy code refactoring, fallback patterns |
+| 04 - Registration (Java) | ⬜ | ✅ | ⬜ | ⬜ | Java-specific patterns |
+| 05 - Travel Booking | ✅ | ⬜ | ⬜ | ⬜ | Saga/compensation patterns |
+| 06 - Support Triage | ⬜ | ✅ | ⬜ | ⬜ | **Signals (NEW!)**, human-in-the-loop, multi-agent AI |
 
 ---
 
