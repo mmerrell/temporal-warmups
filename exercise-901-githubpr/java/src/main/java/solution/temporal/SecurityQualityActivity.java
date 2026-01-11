@@ -1,12 +1,12 @@
 package solution.temporal;
 
 import exercise.model.AgentResult;
-import exercise.model.PullRequest;
+import exercise.model.ReviewRequest;
 import io.temporal.activity.ActivityInterface;
 import io.temporal.activity.ActivityMethod;
 
 @ActivityInterface
 public interface SecurityQualityActivity {
     @ActivityMethod
-    AgentResult analyze(PullRequest pullRequest);
+    AgentResult analyze(ReviewRequest pullRequest);
 }

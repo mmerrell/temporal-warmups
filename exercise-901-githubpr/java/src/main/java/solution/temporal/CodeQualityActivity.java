@@ -1,7 +1,7 @@
 package solution.temporal;
 
 import exercise.model.AgentResult;
-import exercise.model.PullRequest;
+import exercise.model.ReviewRequest;
 import io.temporal.activity.ActivityInterface;
 import io.temporal.activity.ActivityMethod;
 
@@ -9,5 +9,5 @@ import io.temporal.activity.ActivityMethod;
 public interface CodeQualityActivity {
     // NOTE - we pulled out the parameters into an object
     @ActivityMethod
-    AgentResult analyze(PullRequest pullRequest);
+    AgentResult analyze(ReviewRequest pullRequest);
 }
