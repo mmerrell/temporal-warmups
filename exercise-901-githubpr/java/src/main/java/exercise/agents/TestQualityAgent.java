@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import exercise.llm.LlmClient;
 import exercise.llm.LlmOptions;
 import exercise.llm.Message;
+import exercise.llm.OpenAiLlmClient;
 import exercise.model.AgentResult;
 import exercise.model.TestSummary;
 
@@ -21,6 +22,11 @@ public class TestQualityAgent {
 
     public TestQualityAgent(LlmClient llmClient) {
         this.llmClient = llmClient;
+        this.objectMapper = new ObjectMapper();
+    }
+
+    public TestQualityAgent() {
+        this.llmClient = new OpenAiLlmClient();
         this.objectMapper = new ObjectMapper();
     }
 
