@@ -70,3 +70,11 @@ AgentResult security = securityAgent.analyze(
 This is the more involved step. It will require creating the `ActivityImpl` and the business logic objects.
 
 ## 4. (Optional) Update POM.xml for simple CLI execution
+
+```bash
+# Terminal 2: Temporal Worker
+mvn compile exec:java@worker
+
+# Terminal 3: Temporal Client (Starter)
+mvn compile exec:java@workflow
+```

@@ -8,6 +8,7 @@ import io.temporal.activity.ActivityMethod;
 @ActivityInterface
 public interface CodeQualityActivity {
     // NOTE - we pulled out the parameters into an object
-    @ActivityMethod
+
+    @ActivityMethod(name = "AnalyzeCodeQuality")
     AgentResult analyze(ReviewRequest pullRequest);
 }

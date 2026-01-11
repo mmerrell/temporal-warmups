@@ -7,6 +7,6 @@ import io.temporal.activity.ActivityMethod;
 
 @ActivityInterface
 public interface SecurityQualityActivity {
-    @ActivityMethod
+    @ActivityMethod(name = "AnalyzeSecurityQuality")
     AgentResult analyze(ReviewRequest pullRequest);
 }

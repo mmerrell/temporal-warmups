@@ -7,6 +7,6 @@ import io.temporal.activity.ActivityMethod;
 
 @ActivityInterface
 public interface TestQualityActivity {
-    @ActivityMethod
+    @ActivityMethod(name = "AnalyzeTestQuality")
     AgentResult analyze(ReviewRequest pullRequest);
 }
