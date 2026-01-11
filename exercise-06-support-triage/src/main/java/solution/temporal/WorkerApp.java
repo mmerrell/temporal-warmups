@@ -35,6 +35,7 @@ public class WorkerApp {
         worker.registerActivitiesImplementations(new PIIScrubberActivityImpl(piiScrubber),
                 new TicketClassifierActivityImpl(ticketClassifier));
 
+        //8. start the factory
         factory.start();
     }
 }

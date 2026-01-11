@@ -63,9 +63,9 @@ AgentResult security = securityAgent.analyze(
             );
 ```
 
-## 2. Create the Starter using 8-step process
+## 2. Create the Starter using a 6-step process
 
-## 3. Create Worker
+## 3. Create Worker using 8-step process
 
 This is the more involved step. It will require creating the `ActivityImpl` and the business logic objects.
 
