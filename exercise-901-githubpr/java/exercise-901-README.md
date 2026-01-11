@@ -18,6 +18,13 @@ This exercise introduces **two new concepts** not covered in previous exercises:
 
 1. **Temporal Testing with TestWorkflowEnvironment** - Learn how to write integration tests for workflows using Temporal's testing framework
 2. **Spring Boot Integration Patterns** - Understand different approaches for combining Temporal with Spring Boot applications
+3. Handing non-deterministic timeouts;
+
+```java
+// To handle time-based logic or track a "start time" inside your Workflow, use the SDK-provided alternative:
+// Use this instead of System.currentTimeMillis()
+long startMs = Workflow.currentTimeMillis();
+```
 
 You'll also apply advanced patterns:
 - Multi-agent orchestration with independent retry
