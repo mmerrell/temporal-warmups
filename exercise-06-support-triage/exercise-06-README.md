@@ -372,10 +372,10 @@ Time 24h: await() returns false (timeout)
 **Test 1: Happy Path with Approval** ⭐ **Try this with CLI!**
 ```bash
 # Terminal 1: Start your worker
-mvn compile exec:java -Dexec.mainClass="solution.temporal.WorkerApp"
+mvn compile exec:java@worker
 
 # Terminal 2: Start workflow with your client
-mvn compile exec:java -Dexec.mainClass="solution.temporal.Starter"
+mvn compile exec:java@workflow
 
 # Terminal 3: Send approval signal (copy workflow ID from Terminal 2 output)
 temporal workflow signal \
