@@ -72,7 +72,6 @@ public class PRReviewWorkflowImpl implements PRReviewWorkflow {
             long tookMs = Workflow.currentTimeMillis() - startMs;
 
             Metadata metadata = new Metadata(
-//                    Instant.now().toString(),
                     Instant.ofEpochMilli(Workflow.currentTimeMillis()).toString(),
                     tookMs,
                     System.getenv().getOrDefault("OPENAI_MODEL", "gpt-4o-mini")
