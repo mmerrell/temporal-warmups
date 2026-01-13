@@ -38,6 +38,28 @@ Each exercise includes:
 - Continue-as-new
 - Focus: Production patterns
 
+### 🏆 Expert-Level: Production GitHub PR Review System (Exercises 901-909)
+
+**Start Here:** Exercise 901 (Multi-agent AI PR review system)
+
+This series transforms a multi-agent AI system from plain Java through full production deployment:
+
+**Complete Progression:**
+1. **Exercise 901**: Multi-agent sequential execution (Plain Java + Temporal basics)
+2. **Exercise 902**: Spring Boot integration (REST API + dependency injection)
+3. **Exercise 903**: Production deployment (Kubernetes + Prometheus + Grafana)
+4. **Exercise 904**: Temporal Cloud migration (mTLS + Cloud UI)
+5. **Exercise 905**: Batch processing + Continue-as-New (100+ PRs, event history management)
+6. **Exercise 906**: Parallel agent execution (Performance optimization: 6-9s → 2-3s)
+7. **Exercise 907**: Comprehensive testing (TestWorkflowEnvironment + integration tests)
+8. **Exercise 908**: Query methods for real-time progress (Observability patterns)
+9. **Exercise 909**: Human-in-the-loop with signals (Advanced interaction patterns)
+
+**Total Time:** ~12-15 hours across all exercises
+**Difficulty:** ⭐⭐⭐⭐ (Production-grade)
+**Focus:** End-to-end production Temporal application lifecycle
+**What You'll Build:** A real-world AI-powered PR review system from prototype to production
+
 ## 🗂️ Repository Structure
 ```
 temporal-warmups/
