@@ -90,11 +90,11 @@ public class SupportTriageWorkflowImpl implements SupportTriageWorkflow {
     }
 
     @Override
-    public void approveTicket(boolean approved) {
-        this.approved = approved;           // Store the decision
-        this.approvalReceived = true;       // Mark that signal arrived
+    public void approveTicket(solution.domain.ApprovalRequest request) {
+        this.approved = request.isApproved();  // Store the decision
+        this.approvalReceived = true;          // Mark that signal arrived
 
         Workflow.getLogger(SupportTriageWorkflowImpl.class)
-                .info("Approval signal received: " + approved);
+                .info("Approval signal received: " + request.isApproved());
     }
 }
