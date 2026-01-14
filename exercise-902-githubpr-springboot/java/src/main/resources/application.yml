@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+temporal:
+  host: localhost
+  port: 7233
+  task-queue: pr-review
+
+openai:
+  api-key: ${OPENAI_API_KEY:dummy}
+  model: gpt-4o-mini
+  dummy-mode: ${DUMMY_MODE:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    io.temporal: INFO
+    solution.temporal: DEBUG
