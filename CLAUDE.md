@@ -6,7 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a progressive collection of hands-on exercises for building proficiency with Temporal workflow orchestration. Each exercise converts procedural code into durable Temporal workflows with proper activity separation, retry policies, and error handling across Python, Java, Go, and TypeScript.
 
-**Goal:** Complete each exercise in ~1 hour, building speed and confidence over time.
+**Goal:** Complete each exercise, building speed and confidence over time.
+
+Claude's goal is to teach, create metaphors, give tips and tricks. However, Claude should not be creating Temporal code.
+This is the exercise for the engineer. Claude guides, engineer creates.
 
 ## Prerequisites
 
