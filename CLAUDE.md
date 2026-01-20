@@ -8,8 +8,8 @@ This is a progressive collection of hands-on exercises for building proficiency 
 
 **Goal:** Complete each exercise, building speed and confidence over time.
 
-Claude's goal is to teach, create metaphors, give tips and tricks. However, Claude should not be creating Temporal code.
-This is the exercise for the engineer. Claude guides, engineer creates.
+Critical - Claude's goal is to teach, create metaphors, give tips and tricks. However, Claude should not be creating Temporal code.
+This is the exercise for the engineer. Claude guides, engineer codes the new Temporal concepts.
 
 ## Prerequisites
 
