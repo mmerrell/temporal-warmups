@@ -1,334 +1,776 @@
 # Exercise 905: Batch Processing + Continue-as-New
 
-## Instructor's Guide
+## Learning Objectives
+
+By the end of this exercise, you will understand:
+- Why Temporal workflows have event history limits
+- What Continue-as-New is and when to use it
+- How to design state that survives workflow restarts
+- How to implement the "relay race" pattern for large batch processing
 
 ---
 
-### The Story: Why This Matters
+## Part 1: Understanding the Problem
 
-**Imagine you're a librarian** who needs to catalog 10,000 books. You could write every single action in one massive logbook:
+### Why Does Temporal Have a History Limit?
+
+Every action in a Temporal workflow creates an **event** in the history:
+- Workflow started → 1 event
+- Activity scheduled → 1 event
+- Activity completed → 1 event
+- Timer started → 1 event
+- etc.
+
+Temporal stores this history to enable **replay** - if a worker crashes, Temporal replays the history to restore the workflow's exact state. This is the magic that makes workflows durable.
+
+**But there's a cost:** The entire history must fit in memory during replay.
 
 ```
-9:00 AM - Picked up Book #1
-9:01 AM - Checked spine condition
-9:02 AM - Recorded ISBN
-9:03 AM - Shelved Book #1
-9:04 AM - Picked up Book #2
-... (40,000 more entries)
+┌─────────────────────────────────────────────────────────────┐
+│                    TEMPORAL'S LIMIT                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Soft limit: ~10,000 events  (Temporal starts warning)     │
+│   Hard limit: ~50,000 events  (Workflow terminates!)        │
+│                                                              │
+│   Think of it like RAM - fast but finite                    │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-After a few thousand entries, your logbook becomes:
-- **Impossibly heavy** to carry around
-- **Slow to find** where you left off if interrupted
-- **At risk of running out of pages**
+### The Math Problem
 
-**Continue-as-New is like starting a fresh logbook** every 500 books, but carrying a small sticky note that says: "Completed books 1-500. Results in filing cabinet drawer #1."
+In Exercise 901, each PR review creates approximately **11 events**:
+- 3 activities × (schedule + start + complete) = 9 events
+- Plus workflow overhead = ~11 events total
+
+| Batch Size | Events | Problem |
+|------------|--------|---------|
+| 10 PRs | ~110 events | ✅ Fine |
+| 100 PRs | ~1,100 events | ⚠️ Getting heavy |
+| 1,000 PRs | ~11,000 events | 🔴 Exceeds soft limit |
+| 5,000 PRs | ~55,000 events | 💥 Workflow terminated! |
+
+**Question:** How do we process 10,000 PRs if we can only fit ~4,500 in one workflow run?
 
 ---
 
-### The Problem We're Solving
+## Part 2: The Solution - Continue-as-New
 
-In Exercise 901, we built a PR review system that processes **one PR** with 3 AI agents. Each PR creates ~11 events in Temporal's history.
+### The Relay Race Metaphor
 
-**Now scale that to 100+ PRs:**
-
-| Scale | Events | Problem |
-|-------|--------|---------|
-| 1 PR | ~11 events | No problem |
-| 100 PRs | ~1,100 events | Getting heavy |
-| 1,000 PRs | ~11,000 events | Replay slows down |
-| 10,000 PRs | ~110,000 events | Exceeds 50k limit! |
-
-**Temporal's event history is like RAM** - it's fast but finite. Continue-as-New is like "saving to disk and clearing RAM."
-
----
-
-### The Architecture (The "Relay Race" Pattern)
+Imagine a relay race where:
+- Each runner (workflow run) can only run 1/4 of the track
+- At the handoff point, the runner passes a **baton** to the next runner
+- The baton contains: current position, lap count, split times
+- The race continues seamlessly - same race, different runners
 
 ```
-+------------------------------------------------------------------+
-|                    BATCH PR REVIEW WORKFLOW                       |
-+------------------------------------------------------------------+
-|                                                                   |
-|  Runner 1 (Fresh History)          Runner 2 (Fresh History)      |
-|  +---------------------+           +---------------------+        |
-|  | Process PRs 1-20    |  baton    | Process PRs 21-40   |        |
-|  | -----------------> | --------> | -----------------> | ...     |
-|  | ~220 events         |  (state)  | ~220 events         |        |
-|  +---------------------+           +---------------------+        |
-|                                                                   |
-|  The "baton" contains:                                            |
-|  - How many PRs processed so far                                  |
-|  - Which chunk we're on                                           |
-|  - Any failures encountered                                       |
-|  - Accumulated results (or storage reference)                     |
-|                                                                   |
-+------------------------------------------------------------------+
+┌─────────────────────────────────────────────────────────────────┐
+│                    THE RELAY RACE PATTERN                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Run 1                    Run 2                    Run 3         │
+│  ┌──────────┐            ┌──────────┐            ┌──────────┐   │
+│  │ PRs 1-25 │  ──baton── │PRs 26-50 │  ──baton── │PRs 51-75 │   │
+│  │ 275 evts │  ────────► │ 275 evts │  ────────► │ 275 evts │   │
+│  └──────────┘            └──────────┘            └──────────┘   │
+│       │                       │                       │          │
+│       ▼                       ▼                       ▼          │
+│  Fresh history           Fresh history           Fresh history   │
+│  Same workflow ID        Same workflow ID        Same workflow ID│
+│                                                                  │
+│  The "baton" (BatchState) carries:                              │
+│  • How many PRs done (processedCount)                           │
+│  • Results collected so far                                      │
+│  • Total elapsed time                                           │
+│  • Which continuation we're on                                   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Key insight:** Each "runner" is the same workflow, but with a **fresh event history**. The workflow ID stays the same - Temporal links the chain together automatically.
+### What Happens When You Call Continue-as-New?
 
----
-
-### What You'll Build
-
-**File Structure:**
-```
-exercise-905-batch-pr/
-├── exercise-905-README.md          <- This file
-└── java/
-    ├── pom.xml                     <- Copy from 901, update artifact name
-    └── src/main/java/
-        ├── exercise/model/         <- Copy from 901 (ReviewRequest, etc.)
-        └── solution/temporal/
-            ├── model/
-            │   ├── BatchRequest.java       <- YOU CREATE
-            │   ├── BatchState.java         <- YOU CREATE
-            │   ├── BatchResult.java        <- YOU CREATE
-            │   ├── BatchProgress.java      <- YOU CREATE
-            │   └── PRFailure.java          <- YOU CREATE
-            ├── activity/                   <- Copy from 901
-            ├── workflow/
-            │   ├── BatchPRReviewWorkflow.java      <- YOU CREATE
-            │   └── BatchPRReviewWorkflowImpl.java  <- YOU CREATE
-            ├── WorkerApp.java              <- YOU CREATE
-            └── BatchStarter.java           <- YOU CREATE
-```
-
-**5 New Model Classes:**
-
-| Class | Purpose | Metaphor |
-|-------|---------|----------|
-| `BatchRequest` | Input: list of PRs to review | The stack of documents to process |
-| `BatchState` | The "baton" passed between continuations | The sticky note with your progress |
-| `BatchResult` | Final output with statistics | The completion report |
-| `BatchProgress` | Real-time status (for queries) | The progress bar |
-| `PRFailure` | Track which PRs failed | The "problem pile" |
-
----
-
-### Implementation Challenges
-
-#### Challenge 1: Create BatchState (The "Baton")
-
-**Your task:** Create a class that holds everything needed to resume processing after continue-as-new.
-
-**Hints:**
-- What information would you need if the workflow restarted right now?
-- How will you know which PRs are already done?
-- How will you track total time across continuations?
-
-**Fields to consider:**
 ```java
+Workflow.continueAsNew(request, state);  // THE MAGIC LINE
+```
+
+When this line executes:
+
+1. **Current workflow run ends** immediately (code after this line NEVER runs)
+2. **Temporal creates a new workflow run** with:
+   - Same workflow ID
+   - Fresh, empty event history
+   - The arguments you passed (`request`, `state`)
+3. **Your workflow method starts over** from the beginning
+4. **Temporal UI links the runs** in a "Continue-As-New Chain"
+
+**Critical insight:** It's like calling `main()` again, but you get to pass data forward.
+
+---
+
+## Part 3: Designing Your State Classes
+
+### Step 1: BatchState - The Baton (Most Important!)
+
+This is the heart of Continue-as-New. Ask yourself: **"If my workflow restarted RIGHT NOW, what would I need to continue?"**
+
+**Required fields:**
+
+| Field | Type | Why You Need It |
+|-------|------|-----------------|
+| `processedCount` | `int` | To know which PR to process next (skip already-done PRs) |
+| `successCount` | `int` | Track successful reviews |
+| `failureCount` | `int` | Track failed reviews |
+| `chunkIndex` | `int` | Which continuation we're on (for debugging/stats) |
+
+**Think about these:**
+
+| Field | Type | Why You Might Need It |
+|-------|------|----------------------|
+| `accumulatedDurationMs` | `long` | Total time spans multiple runs - each run only knows its own time |
+| `startedAt` | `String` | When the batch started (set once, carried forward) |
+| `results` | `List<ReviewResponse>` | The actual review results |
+| `failures` | `List<PRFailure>` | Info about which PRs failed and why |
+
+**Starter code:**
+
+```java
+package solution.temporal.model;
+
+import exercise.model.ReviewResponse;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * The "baton" passed between continue-as-new runs.
+ *
+ * CRITICAL: Everything you need to resume MUST be in this class!
+ * Local variables in your workflow are LOST on continue-as-new.
+ */
 public class BatchState {
-    // What goes here? Think about:
-    // - Progress tracking
-    // - Results storage
-    // - Error tracking
-    // - Timing information
-}
-```
 
----
+    // TODO: Add fields for tracking progress
+    // Hint: How many PRs have we processed?
 
-#### Challenge 2: Implement the Continue-as-New Check
+    // TODO: Add fields for tracking success/failure counts
 
-**Your task:** Write a method that decides when to "pass the baton."
+    // TODO: Add field for which continuation chunk we're on
 
-**The key API:**
-```java
-WorkflowInfo info = Workflow.getInfo();
-info.isContinueAsNewSuggested()  // Temporal's recommendation
-info.getHistoryLength()          // Current event count
-```
+    // TODO: Add field for accumulated time across all runs
 
-**Question to answer:** At what event count should you trigger continue-as-new? (Hint: stay well under 50,000)
+    // TODO: Add field for when the batch started (ISO-8601 string)
 
----
+    // TODO: Add list to store successful results
 
-#### Challenge 3: The Main Workflow Loop
+    // TODO: Add list to store failure information
 
-**Your task:** Write the processing loop that:
-1. Processes PRs one at a time (reuse logic from Exercise 901)
-2. Updates BatchState after each PR
-3. Checks if continue-as-new is needed
-4. Calls `Workflow.continueAsNew(...)` when appropriate
-
-**Critical gotcha:** What happens to code AFTER `Workflow.continueAsNew()`? (Answer: it never runs!)
-
----
-
-#### Challenge 4: Query Methods
-
-**Your task:** Implement `@QueryMethod` so users can check progress while the batch runs.
-
-**APIs to use:**
-```java
-@QueryMethod
-public BatchProgress getProgress() {
-    // Return current state
-}
-```
-
-**Test with:**
-```bash
-temporal workflow query \
-  --workflow-id=YOUR_WORKFLOW_ID \
-  --query-type=getProgress
-```
-
----
-
-### The Core Pattern (Reveal After You Try)
-
-<details>
-<summary>Click to reveal the continue-as-new pattern</summary>
-
-```java
-// The "Should I pass the baton?" check
-private boolean shouldContinueAsNew() {
-    WorkflowInfo info = Workflow.getInfo();
-
-    // Temporal whispers: "Your history is getting heavy..."
-    if (info.isContinueAsNewSuggested()) {
-        return true;
+    // No-arg constructor required for Temporal serialization
+    public BatchState() {
+        // Initialize your lists here!
     }
 
-    // Or we hit our own safety limit
-    return info.getHistoryLength() > 4000;
-}
+    /**
+     * Factory method - creates initial state for a brand new batch.
+     * Called only on the FIRST run, not on continuations.
+     */
+    public static BatchState initial(String startedAt) {
+        BatchState state = new BatchState();
+        state.startedAt = startedAt;
+        // Initialize counts to 0, lists to empty
+        return state;
+    }
 
-// The main loop
-for (ReviewRequest pr : allPRs) {
-    ReviewResponse result = processSinglePR(pr);
-    state.processedCount++;
+    /**
+     * Call this after successfully processing a PR.
+     */
+    public void recordSuccess(ReviewResponse response) {
+        // TODO: Add to results list, increment counts
+    }
 
-    // Check if it's time to pass the baton
-    if (shouldContinueAsNew()) {
-        state.chunkIndex++;
-
-        // THE MAGIC LINE
-        Workflow.continueAsNew(request, state);
-
-        // Code below NEVER executes!
-        // Workflow restarts with fresh history
+    /**
+     * Call this after a PR fails.
+     */
+    public void recordFailure(PRFailure failure) {
+        // TODO: Add to failures list, increment counts
     }
 }
 ```
 
-</details>
+### Step 2: BatchRequest - The Input
+
+Simple class holding the list of PRs to process.
+
+```java
+package solution.temporal.model;
+
+import exercise.model.ReviewRequest;
+import java.util.List;
+
+/**
+ * Input to the batch workflow - the stack of PRs to review.
+ */
+public class BatchRequest {
+    public List<ReviewRequest> pullRequests;
+    public String batchId;  // Optional: for tracking
+
+    public BatchRequest() {}
+
+    public BatchRequest(List<ReviewRequest> pullRequests, String batchId) {
+        this.pullRequests = pullRequests;
+        this.batchId = batchId;
+    }
+
+    public int getTotalCount() {
+        return pullRequests != null ? pullRequests.size() : 0;
+    }
+}
+```
+
+### Step 3: PRFailure - Tracking Problems
+
+When a PR review fails, capture useful debugging info:
+
+```java
+package solution.temporal.model;
+
+/**
+ * Information about a PR that failed to review.
+ */
+public class PRFailure {
+    public int prIndex;        // Which PR in the batch (0-indexed)
+    public String prTitle;     // The PR title (for human readability)
+    public String errorMessage; // What went wrong
+    public String failedAt;    // When it failed (ISO-8601)
+
+    public PRFailure() {}
+
+    public PRFailure(int prIndex, String prTitle, String errorMessage, String failedAt) {
+        this.prIndex = prIndex;
+        this.prTitle = prTitle;
+        this.errorMessage = errorMessage;
+        this.failedAt = failedAt;
+    }
+}
+```
+
+### Step 4: BatchProgress - For Queries
+
+This lets users check progress while the batch is running.
+
+```java
+package solution.temporal.model;
+
+/**
+ * Current progress - returned by @QueryMethod.
+ */
+public class BatchProgress {
+    public int totalCount;
+    public int processedCount;
+    public int successCount;
+    public int failureCount;
+    public int currentChunk;
+    public double percentComplete;
+    public String currentPrTitle;  // What's being processed right now?
+    public String status;          // "PROCESSING", "COMPLETED", etc.
+
+    public BatchProgress() {}
+
+    // TODO: Add a factory method to build this from BatchState
+}
+```
+
+### Step 5: BatchResult - The Final Output
+
+What the workflow returns when ALL PRs are processed:
+
+```java
+package solution.temporal.model;
+
+import exercise.model.ReviewResponse;
+import java.util.List;
+
+/**
+ * Final result of the batch processing.
+ */
+public class BatchResult {
+    public String batchId;
+    public int totalCount;
+    public int successCount;
+    public int failureCount;
+    public int continuationCount;  // How many continue-as-new calls happened
+    public long totalDurationMs;
+    public String startedAt;
+    public String completedAt;
+    public List<ReviewResponse> results;
+    public List<PRFailure> failures;
+
+    public BatchResult() {}
+
+    // TODO: Add a factory method to build this from BatchState
+}
+```
 
 ---
 
-### Common Pitfalls & Tips
+## Part 4: The Workflow Implementation
 
-| Pitfall | Why It Happens | Solution |
-|---------|----------------|----------|
-| **Forgetting state is lost** | Code after `continueAsNew()` never runs | Put ALL important state in BatchState |
-| **Infinite loop** | Not incrementing `processedCount` | Always update state BEFORE continue-as-new |
-| **Results disappear** | Not carrying results forward | Store in BatchState or external storage |
-| **Timing is wrong** | Each continuation resets time | Accumulate duration in BatchState |
-| **Processing same PRs twice** | Not tracking start index | Use `processedCount` to skip completed PRs |
+### The Workflow Interface
 
-**Pro tip:** Think of `continueAsNew()` like hitting "restart" on a video game level, but you keep your inventory (BatchState).
+**Key insight:** The workflow method takes TWO parameters - the request AND the state:
+
+```java
+package solution.temporal.workflow;
+
+import io.temporal.workflow.QueryMethod;
+import io.temporal.workflow.WorkflowInterface;
+import io.temporal.workflow.WorkflowMethod;
+import solution.temporal.model.*;
+
+@WorkflowInterface
+public interface BatchPRReviewWorkflow {
+
+    /**
+     * Process a batch of PRs.
+     *
+     * WHY TWO PARAMETERS?
+     * - request: The full list of PRs (same across all continuations)
+     * - state: The "baton" (null on first run, populated on continuations)
+     *
+     * On first call: processBatch(request, null)
+     * On continuation: processBatch(request, stateFromPreviousRun)
+     */
+    @WorkflowMethod
+    BatchResult processBatch(BatchRequest request, BatchState state);
+
+    /**
+     * Query method - check progress without affecting workflow.
+     *
+     * Test with:
+     * temporal workflow query --workflow-id=YOUR_ID --type=getProgress
+     */
+    @QueryMethod
+    BatchProgress getProgress();
+}
+```
+
+### The Workflow Implementation - Structure
+
+```java
+package solution.temporal.workflow;
+
+import exercise.model.*;
+import io.temporal.activity.ActivityOptions;
+import io.temporal.common.RetryOptions;
+import io.temporal.workflow.Workflow;
+import solution.temporal.activity.*;
+import solution.temporal.model.*;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
+
+public class BatchPRReviewWorkflowImpl implements BatchPRReviewWorkflow {
+
+    // ═══════════════════════════════════════════════════════════════
+    // CONFIGURATION
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * When to trigger continue-as-new.
+     *
+     * WHY 4000?
+     * - Hard limit is 50,000 events
+     * - We want to stay WELL under that
+     * - Lower = more continuations but safer
+     * - Higher = fewer continuations but riskier
+     */
+    private static final int HISTORY_THRESHOLD = 4000;
+
+    // Activity options - same as Exercise 901
+    private static final ActivityOptions ACTIVITY_OPTIONS = ActivityOptions.newBuilder()
+            .setStartToCloseTimeout(Duration.ofSeconds(60))
+            .setRetryOptions(RetryOptions.newBuilder()
+                    .setInitialInterval(Duration.ofSeconds(5))
+                    .setBackoffCoefficient(2.0)
+                    .setMaximumAttempts(3)
+                    .build())
+            .build();
+
+    // ═══════════════════════════════════════════════════════════════
+    // ACTIVITY STUBS
+    // ═══════════════════════════════════════════════════════════════
+
+    // TODO: Create activity stubs (same pattern as Exercise 901)
+    // private final CodeQualityActivity codeQualityActivity = ...
+    // private final TestQualityActivity testQualityActivity = ...
+    // private final SecurityQualityActivity securityQualityActivity = ...
+
+    // ═══════════════════════════════════════════════════════════════
+    // WORKFLOW STATE (for query method)
+    // ═══════════════════════════════════════════════════════════════
+
+    // These fields let the query method see current progress
+    private BatchState currentState;
+    private BatchRequest currentRequest;
+    private String currentPrTitle;
+    private long chunkStartMs;
+
+    // ═══════════════════════════════════════════════════════════════
+    // MAIN WORKFLOW METHOD
+    // ═══════════════════════════════════════════════════════════════
+
+    @Override
+    public BatchResult processBatch(BatchRequest request, BatchState state) {
+
+        // ─────────────────────────────────────────────────────────
+        // STEP 1: Initialize or resume state
+        // ─────────────────────────────────────────────────────────
+
+        if (state == null) {
+            // FIRST RUN - create fresh state
+            String startedAt = Instant.ofEpochMilli(Workflow.currentTimeMillis()).toString();
+            state = BatchState.initial(startedAt);
+            System.out.println("Starting batch: " + request.getTotalCount() + " PRs");
+        } else {
+            // CONTINUATION - we're resuming from a previous run
+            System.out.println("Continuing batch at chunk #" + (state.chunkIndex + 1));
+            System.out.println("Already processed: " + state.processedCount);
+        }
+
+        // Store for query access
+        this.currentState = state;
+        this.currentRequest = request;
+        this.chunkStartMs = Workflow.currentTimeMillis();
+
+        // ─────────────────────────────────────────────────────────
+        // STEP 2: The main processing loop
+        // ─────────────────────────────────────────────────────────
+
+        List<ReviewRequest> allPRs = request.pullRequests;
+
+        // KEY: Start from processedCount, not 0!
+        // This skips PRs we already processed in previous runs.
+        for (int i = state.processedCount; i < allPRs.size(); i++) {
+
+            ReviewRequest pr = allPRs.get(i);
+            currentPrTitle = pr.prTitle;
+
+            try {
+                // TODO: Process single PR (reuse logic from Exercise 901)
+                // ReviewResponse response = processSinglePR(pr);
+                // state.recordSuccess(response);
+
+            } catch (Exception e) {
+                // TODO: Record failure, but keep processing other PRs
+                // PRFailure failure = new PRFailure(i, pr.prTitle, e.getMessage(), ...);
+                // state.recordFailure(failure);
+            }
+
+            // ─────────────────────────────────────────────────────
+            // STEP 3: Check if we need to continue-as-new
+            // ─────────────────────────────────────────────────────
+
+            if (shouldContinueAsNew()) {
+                System.out.println("History threshold reached. Continuing as new...");
+
+                // Update accumulated time before passing the baton
+                long chunkDurationMs = Workflow.currentTimeMillis() - chunkStartMs;
+                state.accumulatedDurationMs += chunkDurationMs;
+                state.chunkIndex++;
+
+                // ═══════════════════════════════════════════════════
+                // THE MAGIC LINE - Pass the baton!
+                // ═══════════════════════════════════════════════════
+                Workflow.continueAsNew(request, state);
+
+                // ⚠️ NOTHING BELOW THIS LINE EVER EXECUTES ⚠️
+                // The workflow has already restarted with fresh history.
+                // If you put important code here, it will be LOST!
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // STEP 4: All PRs processed - build final result
+        // ─────────────────────────────────────────────────────────
+
+        currentPrTitle = null;  // Clear for query
+        long finalChunkDurationMs = Workflow.currentTimeMillis() - chunkStartMs;
+        String completedAt = Instant.ofEpochMilli(Workflow.currentTimeMillis()).toString();
+
+        // TODO: Build and return BatchResult
+        // return BatchResult.from(state, request, completedAt, finalChunkDurationMs);
+        return null; // Replace with actual result
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // QUERY METHOD
+    // ═══════════════════════════════════════════════════════════════
+
+    @Override
+    public BatchProgress getProgress() {
+        // TODO: Build BatchProgress from current state
+        // Return empty progress if state not yet initialized
+        return new BatchProgress();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // HELPER METHODS
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Should we pass the baton to a new workflow run?
+     */
+    private boolean shouldContinueAsNew() {
+        // Temporal can tell us if history is getting heavy
+        if (Workflow.getInfo().isContinueAsNewSuggested()) {
+            return true;
+        }
+
+        // Or we hit our own safety threshold
+        return Workflow.getInfo().getHistoryLength() > HISTORY_THRESHOLD;
+    }
+
+    /**
+     * Process a single PR through all 3 agents.
+     * Copy and adapt this from Exercise 901's PRReviewWorkflowImpl.
+     */
+    private ReviewResponse processSinglePR(ReviewRequest pr) {
+        // TODO: Call the 3 activities sequentially
+        // TODO: Aggregate results (BLOCK > REQUEST_CHANGES > APPROVE)
+        // TODO: Return ReviewResponse
+        return null;
+    }
+}
+```
 
 ---
 
-### How to Verify It Works
+## Part 5: WorkerApp and BatchStarter
 
-**Run the exercise:**
+### WorkerApp.java
+
+Same pattern as Exercise 901, but with the batch workflow:
+
+```java
+package solution.temporal;
+
+import exercise.agents.*;
+import io.temporal.client.WorkflowClient;
+import io.temporal.serviceclient.WorkflowServiceStubs;
+import io.temporal.worker.Worker;
+import io.temporal.worker.WorkerFactory;
+import solution.temporal.activity.*;
+import solution.temporal.workflow.BatchPRReviewWorkflowImpl;
+
+public class WorkerApp {
+
+    private static final String TASK_QUEUE = "batch-pr-review";
+
+    public static void main(String[] args) {
+        // 1. Connect to Temporal
+        WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
+        WorkflowClient client = WorkflowClient.newInstance(service);
+
+        // 2. Create worker
+        WorkerFactory factory = WorkerFactory.newInstance(client);
+        Worker worker = factory.newWorker(TASK_QUEUE);
+
+        // 3. Register workflow
+        worker.registerWorkflowImplementationTypes(BatchPRReviewWorkflowImpl.class);
+
+        // 4. Create agents and register activities
+        // TODO: Same as Exercise 901
+
+        // 5. Start
+        factory.start();
+        System.out.println("Worker started on queue: " + TASK_QUEUE);
+    }
+}
+```
+
+### BatchStarter.java
+
+Starts the workflow with a batch of sample PRs:
+
+```java
+package solution.temporal;
+
+import exercise.model.*;
+import io.temporal.client.WorkflowClient;
+import io.temporal.client.WorkflowOptions;
+import io.temporal.serviceclient.WorkflowServiceStubs;
+import solution.temporal.model.*;
+import solution.temporal.workflow.BatchPRReviewWorkflow;
+
+import java.util.*;
+
+public class BatchStarter {
+
+    private static final String TASK_QUEUE = "batch-pr-review";
+    private static final int NUM_PRS = 100;  // Adjust to test continue-as-new
+
+    public static void main(String[] args) {
+        // 1. Connect to Temporal
+        WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
+        WorkflowClient client = WorkflowClient.newInstance(service);
+
+        // 2. Generate sample PRs
+        List<ReviewRequest> prs = generateSamplePRs(NUM_PRS);
+        String batchId = "batch-" + UUID.randomUUID().toString().substring(0, 8);
+        BatchRequest request = new BatchRequest(prs, batchId);
+
+        // 3. Create workflow stub
+        String workflowId = "batch-pr-review-" + batchId;
+        BatchPRReviewWorkflow workflow = client.newWorkflowStub(
+            BatchPRReviewWorkflow.class,
+            WorkflowOptions.newBuilder()
+                .setTaskQueue(TASK_QUEUE)
+                .setWorkflowId(workflowId)
+                .build()
+        );
+
+        System.out.println("Starting batch: " + workflowId);
+        System.out.println("PRs to process: " + NUM_PRS);
+        System.out.println("View at: http://localhost:8233/namespaces/default/workflows/" + workflowId);
+
+        // 4. Start workflow - FIRST run gets null state
+        BatchResult result = workflow.processBatch(request, null);
+
+        // 5. Print results
+        System.out.println("\n=== BATCH COMPLETE ===");
+        System.out.println("Processed: " + result.totalCount);
+        System.out.println("Succeeded: " + result.successCount);
+        System.out.println("Failed: " + result.failureCount);
+        System.out.println("Continuations: " + result.continuationCount);
+    }
+
+    private static List<ReviewRequest> generateSamplePRs(int count) {
+        List<ReviewRequest> prs = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            ReviewRequest pr = new ReviewRequest();
+            pr.prTitle = "PR-" + (i + 1) + ": Sample change";
+            pr.prDescription = "Test PR for batch processing";
+            pr.diff = "+ // Change " + i;
+            pr.testSummary = new TestSummary(true, 5, 0, 100);
+            prs.add(pr);
+        }
+        return prs;
+    }
+}
+```
+
+---
+
+## Part 6: Testing Your Implementation
+
+### Run the Exercise
+
 ```bash
 # Terminal 1: Start Temporal
 temporal server start-dev
 
-# Terminal 2: Start Worker
+# Terminal 2: Start Worker (use DUMMY_MODE to avoid API costs)
 cd exercise-905-batch-pr/java
-mvn compile exec:java@worker
+DUMMY_MODE=true mvn compile exec:java@worker
 
 # Terminal 3: Start Batch
 mvn compile exec:java@batch
 ```
 
-**In the Temporal UI (http://localhost:8233):**
+### What to Look For in the Temporal UI
 
-1. Find your workflow by ID
-2. Look for **"ContinueAsNewInitiated"** events
-3. Click **"Continue As New Chain"** to see all continuations
-4. Each continuation should have ~200-300 events (not thousands)
-5. Final workflow shows **"Completed"**
+1. Go to http://localhost:8233
+2. Find your workflow (search for "batch-pr-review")
+3. Look for **"ContinueAsNewInitiated"** events in the history
+4. Click the **"Continue As New Chain"** link to see all runs linked together
+5. Each run should have ~200-500 events, not thousands
 
-**What to observe:**
+### Query Progress Mid-Execution
 
-```
-Workflow: batch-pr-review-abc123
-├── Run #1: 247 events -> ContinueAsNewInitiated
-├── Run #2: 251 events -> ContinueAsNewInitiated
-├── Run #3: 238 events -> ContinueAsNewInitiated
-├── Run #4: 244 events -> ContinueAsNewInitiated
-└── Run #5: 189 events -> Completed
+While the batch is running:
+
+```bash
+temporal workflow query \
+  --workflow-id=batch-pr-review-YOUR_BATCH_ID \
+  --type=getProgress
 ```
 
 ---
 
-### Success Criteria
+## Part 7: Self-Check Questions
+
+Answer these before looking at the hints:
+
+1. **Why does `processBatch` take two parameters instead of just the request?**
+
+2. **What would happen if you put code after `Workflow.continueAsNew()`?**
+
+3. **Why do we start the loop at `state.processedCount` instead of 0?**
+
+4. **Why do we accumulate duration across runs instead of just timing the last run?**
+
+5. **What would happen if BatchState wasn't serializable (e.g., contained a Thread or InputStream)?**
+
+<details>
+<summary>Click to see answers</summary>
+
+1. The `state` parameter lets us pass the "baton" on continuations. First call uses `null`, continuations pass the state from the previous run.
+
+2. That code would **never execute**. `continueAsNew()` immediately ends the current run.
+
+3. To skip PRs we already processed in previous runs. Otherwise we'd process PR #1 over and over!
+
+4. Because `Workflow.currentTimeMillis()` resets on each continuation. We need to sum up all the chunks.
+
+5. The workflow would fail with a serialization error. BatchState must be plain data (strings, numbers, lists, maps).
+
+</details>
+
+---
+
+## Common Mistakes to Avoid
+
+| Mistake | Symptom | Fix |
+|---------|---------|-----|
+| Forgetting to increment `processedCount` | Infinite loop processing same PRs | Update state BEFORE `continueAsNew()` |
+| Putting logic after `continueAsNew()` | Code never runs | Move important code BEFORE the call |
+| Not initializing state on first run | NullPointerException | Check `if (state == null)` and create initial state |
+| Starting loop at 0 instead of `processedCount` | PRs processed multiple times | Use `for (int i = state.processedCount; ...)` |
+| Storing non-serializable data in BatchState | Serialization errors | Only use primitives, Strings, Lists, Maps |
+
+---
+
+## Success Criteria
 
 | Criteria | How to Verify |
 |----------|---------------|
-| All 100 PRs processed | `BatchResult.successCount + failureCount == 100` |
-| Multiple continuations | `BatchResult.continuationCount >= 4` |
-| No duplicate processing | Each PR appears exactly once in results |
-| Progress queryable | `getProgress()` returns data mid-execution |
-| History stays small | Each run has < 500 events |
+| All PRs processed | `successCount + failureCount == totalCount` |
+| Multiple continuations | `continuationCount >= 1` (for 100 PRs) |
+| No duplicates | Each PR in results exactly once |
+| Progress queryable | `getProgress()` returns data mid-run |
+| History stays small | Each run < 500 events in UI |
 
 ---
 
-### Files to Reference from Exercise 901
+## Stretch Goals
 
-```
-exercise-901-githubpr/java/src/main/java/
-├── solution/temporal/
-│   ├── PRReviewWorkflowImpl.java  <- Copy processSinglePR logic
-│   ├── *Activity.java             <- Reuse all 3 activity interfaces
-│   └── *ActivityImpl.java         <- Reuse all 3 implementations
-└── exercise/model/
-    ├── ReviewRequest.java         <- Reuse as-is
-    ├── ReviewResponse.java        <- Reuse as-is
-    └── AgentResult.java           <- Reuse as-is
-```
+Once the basics work:
+
+1. **Parallel Processing:** Use `Async.function()` to process 5 PRs simultaneously
+2. **Pause/Resume:** Add a Signal to pause batch mid-execution
+3. **External Storage:** Store results in a database instead of carrying them in state
+4. **Retry Failed:** Re-process failed PRs at the end of the batch
 
 ---
 
-### Self-Check Questions
-
-Before you start coding, answer these:
-
-1. **What happens to local variables when `continueAsNew()` is called?**
-
-2. **If processing PR #47 triggers continue-as-new, which PR does the new workflow start with?**
-
-3. **Why can't we just use a regular `while` loop that runs forever?**
-
-4. **What would happen if we forgot to increment `processedCount` before continue-as-new?**
-
-5. **How does the Temporal UI show the relationship between continuations?**
-
----
-
-### Stretch Goals (After You Nail the Basics)
-
-1. **Parallel Processing:** Process 5 PRs at once using `Async.function()`
-2. **External Storage:** Store results in a database instead of carrying them
-3. **Pause/Resume:** Add signals to pause the batch mid-execution
-4. **Retry Failed PRs:** Re-attempt failed PRs at the end of the batch
-
----
-
-### Resources
+## Resources
 
 - [Temporal Continue-As-New Docs](https://docs.temporal.io/develop/java/continue-as-new)
 - [Workflow.getInfo() API](https://www.javadoc.io/doc/io.temporal/temporal-sdk/latest/io/temporal/workflow/Workflow.html)
-- Exercise 901 source code (your starting point)
+- Exercise 901 source code (your starting point for single-PR logic)
 
 ---
 
-**Now go build it!** Start with `BatchState.java` - it's the heart of the Continue-as-New pattern.
+**Ready?** Start with `BatchState.java` - it's the foundation everything else builds on!
