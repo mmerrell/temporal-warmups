@@ -11,12 +11,22 @@ public class BatchState {
     public int failedCount;
     public int chunkIndex;
     public long accumulatedDurationMs;
+    // Q: When did the ENTIRE batch start (not just this continuation)?
+    // Hint: Set this only on the first run, then carry it forward
     public String startedAt;
-    public List<ReviewResponse> result;
+    public List<ReviewResponse> results;
     public List<PRFailure> failures;
 
+    /**
+     * No-arg constructor required for Temporal serialization.
+     *
+     * Q: What happens if you call results.add(...) when results is null?
+     * A: NullPointerException!
+     *
+     * IMPORTANT: Initialize your lists here!
+     */
     public BatchState(){
-        result = new ArrayList<>();
+        results = new ArrayList<>();
         failures = new ArrayList<>();
     }
 
@@ -33,7 +43,7 @@ public class BatchState {
      * Call this after successfully processing a PR.
      */
     public void recordSuccess(ReviewResponse response) {
-        result.add(response);
+        results.add(response);
         processedCount++;
         successfulCount++;
     }

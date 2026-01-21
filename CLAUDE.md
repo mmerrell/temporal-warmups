@@ -202,6 +202,8 @@ price: float    # 99.99
 - Use Activity stubs for type-safe activity invocation
 - Builder patterns for retry policies and timeouts
 - Dependencies via Maven (pom.xml)
+- Using System.out.println(...) directly in Workflow code is discouraged.
+Temporal Workflows can be replayed many times, and any side effects (like printing to stdout) will be repeated on every replay. This leads to duplicated and misleading logs. Instead, you should use the Java SDK’s replay-safe Workflow logger
 
 ## Progression Path
 
