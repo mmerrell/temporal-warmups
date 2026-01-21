@@ -269,3 +269,9 @@ Temporal Workflows can be replayed many times, and any side effects (like printi
 - Temporal Documentation: https://docs.temporal.io
 - Python SDK: https://docs.temporal.io/dev-guide/python
 - Java SDK: https://docs.temporal.io/dev-guide/java
+
+## Call To Action
+Every README should have the following CTA added after the ## Scenario
+## Quickstart Docs By Temporal
+
+🚀 [Get started in a few mins](https://docs.temporal.io/quickstarts?utm_campaign=awareness-nikolay-advolodkin&utm_medium=code&utm_source=github)
