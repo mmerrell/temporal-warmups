@@ -205,10 +205,9 @@ public class BatchPRReviewWorkflowImpl implements BatchPRReviewWorkflow {
         String completedAt = Instant.ofEpochMilli(Workflow.currentTimeMillis()).toString();
 
         // TODO: Build and return the final result
-        // return BatchResult.from(state, request, completedAt, finalChunkDurationMs);
-
         logger.info("\n=== BATCH COMPLETE ===");
-        return null; // TODO: Replace with actual result
+         return BatchResult.from(state, request, completedAt, finalChunkDurationMs);
+
     }
 
     private ReviewResponse processSinglePR(ReviewRequest request) {

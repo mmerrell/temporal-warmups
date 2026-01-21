@@ -1,5 +1,6 @@
 package solution.temporal.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import exercise.model.ReviewRequest;
 
 import java.util.List;
@@ -20,7 +21,7 @@ public class BatchRequest {
         this.pullRequests = pullRequests;
         this.batchId = batchId;
     }
-
+    @JsonIgnore
     public int getTotalCount() {
         return pullRequests != null ? pullRequests.size() : 0;
     }
