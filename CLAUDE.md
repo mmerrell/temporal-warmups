@@ -6,7 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a progressive collection of hands-on exercises for building proficiency with Temporal workflow orchestration. Each exercise converts procedural code into durable Temporal workflows with proper activity separation, retry policies, and error handling across Python, Java, Go, and TypeScript.
 
-**Goal:** Complete each exercise in ~1 hour, building speed and confidence over time.
+**Goal:** Complete each exercise, building speed and confidence over time.
+
+Critical - Claude's goal is to teach, create metaphors, give tips and tricks. However, Claude should not be creating Temporal code.
+This is the exercise for the engineer. Claude guides, engineer codes the new Temporal concepts.
 
 ## Prerequisites
 
@@ -200,6 +203,8 @@ price: float    # 99.99
 - Use Activity stubs for type-safe activity invocation
 - Builder patterns for retry policies and timeouts
 - Dependencies via Maven (pom.xml)
+- Using System.out.println(...) directly in Workflow code is discouraged.
+Temporal Workflows can be replayed many times, and any side effects (like printing to stdout) will be repeated on every replay. This leads to duplicated and misleading logs. Instead, you should use the Java SDK’s replay-safe Workflow logger
 
 #### Parallel Workflow Execution (Java)
 
@@ -302,3 +307,9 @@ String workflowId = "payment-" + paymentId; // e.g., "payment-PAY-98765"
 - Temporal Documentation: https://docs.temporal.io
 - Python SDK: https://docs.temporal.io/dev-guide/python
 - Java SDK: https://docs.temporal.io/dev-guide/java
+
+## Call To Action
+Every README should have the following CTA added after the ## Scenario
+## Quickstart Docs By Temporal
+
+🚀 [Get started in a few mins](https://docs.temporal.io/quickstarts?utm_campaign=awareness-nikolay-advolodkin&utm_medium=code&utm_source=github)
