@@ -11,6 +11,10 @@ The system routes high-risk or low-confidence tickets to human review, while aut
 
 ![signal](src/main/java/solution/temporal/signal-image.png)
 
+## Quickstart Docs By Temporal
+
+🚀 [Get started in a few mins](https://docs.temporal.io/quickstarts?utm_campaign=awareness-nikolay-advolodkin&utm_medium=code&utm_source=github)
+
 ## Run the Pre-Temporal Baseline
 
 ### Prerequisites

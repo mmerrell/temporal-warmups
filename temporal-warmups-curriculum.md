@@ -684,6 +684,126 @@ These exercises form the foundation for two workshop tracks:
 
 ---
 
-**Status:** Active Development (December 2024 - January 2025)  
-**Current Progress:** Exercises #1, #2, #2.5, #3 Complete  
+**Status:** Active Development (December 2024 - January 2025)
+**Current Progress:** Exercises #1, #2, #2.5, #3 Complete
 **Next Up:** Multi-language rotation or Exercise #4-5
+
+---
+
+## Future Exercises Roadmap
+
+Planned exercises organized by domain. Priority items are marked with 🔥.
+
+### AI/ML Orchestration
+
+| Exercise | Description | Concepts | Priority |
+|----------|-------------|----------|----------|
+| **Deep Research Orchestration** | Coordinate multi-step research workflows: query decomposition → parallel searches → synthesis → fact-checking → report generation | Parallel execution, long-running workflows, continue-as-new | 🔥 |
+| **OpenAI Agents SDK Integration** | Orchestrate OpenAI function-calling agents with Temporal for durability and observability | External API activities, agent state management, tool execution | 🔥 |
+| **OpenAI Codex Workflow** | Code generation pipeline: requirements → code gen → validation → testing → human review | Human-in-the-loop, signals, multi-stage pipelines | 🔥 |
+| **ML Model Training Pipeline** | Coordinate data prep → training → evaluation → model registry → deployment | Long-running activities, checkpointing, heartbeats |  |
+| **RAG Pipeline Orchestration** | Document ingestion → chunking → embedding → indexing with retry and fallback | Parallel processing, claim check pattern |  |
+| **Multi-Agent Coordination** | Multiple AI agents collaborating on complex tasks with handoffs and consensus | Parent-child workflows, signals between workflows |  |
+| **LLM Gateway with Fallbacks** | Route requests across multiple LLM providers with rate limiting and fallback | Fallback patterns, rate limiting, circuit breaker |  |
+
+### Order Management & Bookings (OMS)
+
+| Exercise | Description | Concepts | Priority |
+|----------|-------------|----------|----------|
+| **Order Lifecycle Management** | Full order flow: create → validate → payment → fulfillment → shipping → delivery tracking | Saga pattern, state machines, long-running workflows | 🔥 |
+| **Inventory Reservation System** | Reserve → hold → confirm/release with timeout-based auto-release | Timers, compensation, distributed locking |  |
+| **Multi-Vendor Marketplace Order** | Split orders across vendors, coordinate fulfillment, handle partial failures | Fan-out/fan-in, partial success handling |  |
+| **Subscription & Recurring Orders** | Subscription lifecycle with billing cycles, renewals, upgrades/downgrades | Continue-as-new, cron workflows, versioning |  |
+| **Returns & Refunds Processing** | Return request → approval → shipping → inspection → refund/exchange | Signals for approvals, compensation chains |  |
+
+### Payment Processing
+
+| Exercise | Description | Concepts | Priority |
+|----------|-------------|----------|----------|
+| **Payment Gateway Orchestration** | Auth → capture → settlement with idempotency and retry handling | Idempotency keys, retry policies, compensation | 🔥 |
+| **Multi-PSP Failover** | Route payments across Stripe/PayPal/Adyen with intelligent fallback | Fallback patterns, circuit breaker, health checks |  |
+| **Escrow & Marketplace Payments** | Hold → release/refund based on delivery confirmation or dispute | Timers, signals, human-in-the-loop |  |
+| **Split Payments & Payouts** | Collect payment → calculate splits → payout to multiple parties | Parallel execution, compensation |  |
+| **Fraud Detection Pipeline** | Real-time scoring → rules evaluation → human review for edge cases | Async activities, signals, decision workflows |  |
+
+### Human-in-the-Loop Approval Workflows
+
+| Exercise | Description | Concepts | Priority |
+|----------|-------------|----------|----------|
+| **Multi-Level Approval Chain** | Sequential approvals with escalation, delegation, and timeout auto-actions | Signals, timers, workflow queries | 🔥 |
+| **Document Review Workflow** | Submit → assign reviewer → review → approve/reject/revise cycle | Signals, workflow state, update handlers |  |
+| **Expense Approval System** | Submit → manager → finance → payment with policy-based routing | Dynamic routing, parallel approvals |  |
+| **Content Moderation Pipeline** | Auto-classify → flag for review → human decision → action | ML integration, signals, SLAs with timers |  |
+| **Change Management (ITSM)** | RFC → impact assessment → CAB review → implementation → validation | Long-running, multiple signals, audit trail |  |
+
+### Infrastructure Management & CI/CD
+
+| Exercise | Description | Concepts | Priority |
+|----------|-------------|----------|----------|
+| **CI/CD Pipeline Orchestration** | Build → test → security scan → deploy → smoke test → rollback on failure | Compensation (rollback), parallel stages | 🔥 |
+| **Infrastructure Provisioning** | Terraform/Pulumi orchestration with drift detection and remediation | Long-running activities, heartbeats, compensation |  |
+| **Blue-Green Deployment** | Provision → deploy → health check → traffic shift → cleanup old | Staged execution, compensation, signals |  |
+| **Incident Response Automation** | Detect → triage → notify → remediate → postmortem | Signals, escalation timers, human-in-the-loop |  |
+| **Database Migration Orchestration** | Backup → migrate → validate → cutover with rollback capability | Compensation, checkpointing, long-running |  |
+| **Kubernetes Operator Patterns** | Reconciliation loops, desired state management, self-healing | Continue-as-new, periodic execution |  |
+
+### Exercise Ideas by Temporal Feature
+
+For exercises that focus on teaching specific Temporal features:
+
+| Feature | Exercise Idea | Domain |
+|---------|---------------|--------|
+| **Signals** | Real-time order status updates from external systems | OMS |
+| **Queries** | Dashboard polling workflow state without affecting execution | Any |
+| **Update Handlers** | Modify in-flight workflow parameters (price adjustments, priority changes) | OMS/Payments |
+| **Schedules** | Recurring report generation, scheduled maintenance windows | Infrastructure |
+| **Child Workflows** | Order items processed as individual child workflows | OMS |
+| **Continue-as-New** | Subscription billing running for years | Payments |
+| **Versioning** | Safe deployment of workflow changes in production | All |
+| **Interceptors** | Cross-cutting concerns: logging, metrics, authorization | All |
+| **Custom Data Converters** | Handle Enums, Decimals, complex types properly | All |
+
+### Implementation Priority Order
+
+**Phase 1 (Next 🔥):**
+1. Deep Research Orchestration - AI/ML + parallel execution + long-running
+2. Multi-Level Approval Chain - Human-in-the-loop + signals
+3. Payment Gateway Orchestration - Idempotency + compensation
+
+**Phase 2:**
+4. OpenAI Agents SDK Integration - Modern AI patterns
+5. CI/CD Pipeline Orchestration - Infrastructure patterns
+6. Order Lifecycle Management - Comprehensive OMS
+
+**Phase 3:**
+7. OpenAI Codex Workflow - Code generation with human review
+8. ML Model Training Pipeline - Long-running ML ops
+9. Multi-Vendor Marketplace Order - Complex fan-out scenarios
+
+---
+
+## Contributing New Exercises
+
+When adding new exercises, follow this template:
+
+```markdown
+### Exercise #XX: [Name] ⭐⭐⭐
+**Language:** Python/Java/Go/TypeScript
+**Time:** ~X hours
+**Concepts:** [List key Temporal concepts]
+
+**Scenario:** [1-2 sentence real-world scenario]
+
+**Learning Goals:**
+- Goal 1
+- Goal 2
+- Goal 3
+
+**Key Patterns:**
+- Pattern 1
+- Pattern 2
+
+**Status:** 🔲 Not Started / 🟡 In Progress / ✅ Complete
+```
+
+---
