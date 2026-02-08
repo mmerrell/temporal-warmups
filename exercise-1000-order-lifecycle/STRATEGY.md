@@ -16,6 +16,13 @@ Follow execution steps in `ReviewOrchestrator.java` to finish the workflow
 4. call the workflow method
 
 ## 2. Create the Starter using a 6-step process
+//1. set a task queue name in an interface for reuse
+//2. create main
+//3. connect to temporal server, same as Worker
+//4. create workflowId
+String workflowId = TASK_QUEUE + "-" + UUID.randomUUID().toString().substring(0, 8);
+//5. create a workflow stub
+//6. call the workflow
 
 ## 3. Create Worker using 8-step process
 
