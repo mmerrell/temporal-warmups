@@ -8,8 +8,8 @@ This is a progressive collection of hands-on exercises for building proficiency 
 
 **Goal:** Complete each exercise, building speed and confidence over time.
 
-Claude's goal is to teach, create metaphors, give tips and tricks. However, Claude should not be creating Temporal code.
-This is the exercise for the engineer. Claude guides, engineer creates.
+Critical - Claude's goal is to teach, create metaphors, give tips and tricks. However, Claude should not be creating Temporal code.
+This is the exercise for the engineer. Claude guides, engineer codes the new Temporal concepts.
 
 ## Prerequisites
 
@@ -66,8 +66,9 @@ temporal-warmups/
 ├── exercise-03-hotel/           # Messy code refactoring, fallback patterns
 ├── exercise-04-registration-java/  # Java implementation
 ├── exercise-05-booking/         # Saga/compensation patterns
-├── exercise-06-support-triage/  # Multi-agent AI, Signals (NEW!), Human-in-the-loop
-├── exercise-07-distilled/       # (In development)
+├── exercise-06-support-triage/   # Multi-agent AI, Signals, Human-in-the-loop
+├── exercise-06a-parallel-tickets/ # Parallel workflow execution, Business ID patterns
+├── exercise-07-distilled/        # (In development)
 └── temporal-warmups-curriculum.md  # Full curriculum with learning objectives
 ```
 
@@ -202,6 +203,45 @@ price: float    # 99.99
 - Use Activity stubs for type-safe activity invocation
 - Builder patterns for retry policies and timeouts
 - Dependencies via Maven (pom.xml)
+- Using System.out.println(...) directly in Workflow code is discouraged.
+Temporal Workflows can be replayed many times, and any side effects (like printing to stdout) will be repeated on every replay. This leads to duplicated and misleading logs. Instead, you should use the Java SDK’s replay-safe Workflow logger
+
+#### Parallel Workflow Execution (Java)
+
+Start multiple workflows concurrently using `WorkflowClient.execute()`:
+
+```java
+List<CompletableFuture<Result>> futures = new ArrayList<>();
+for (Item item : items) {
+    MyWorkflow workflow = client.newWorkflowStub(MyWorkflow.class, options);
+    // Returns immediately - workflow runs in background
+    CompletableFuture<Result> future = WorkflowClient.execute(workflow::process, item);
+    futures.add(future);
+}
+// Wait for all to complete
+CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+```
+
+**Key Methods:**
+- `WorkflowClient.start()` - Fire and forget, returns `WorkflowExecution`
+- `WorkflowClient.execute()` - Returns `CompletableFuture<R>` for result
+
+#### Business Identifier Workflow IDs
+
+Use meaningful workflow IDs based on business entities:
+
+```java
+// Instead of: TASK_QUEUE + "-" + UUID.randomUUID()
+// Use:        "{type}-{business-id}"
+String workflowId = "triage-" + ticketId;   // e.g., "triage-TKT-001"
+String workflowId = "order-" + orderId;     // e.g., "order-ORD-12345"
+String workflowId = "payment-" + paymentId; // e.g., "payment-PAY-98765"
+```
+
+**Benefits:**
+- Find workflows easily in Temporal UI by business entity
+- Idempotent: same business ID = same workflow ID (prevents duplicates)
+- Meaningful for logging, debugging, and operations
 
 ## Progression Path
 
@@ -216,12 +256,12 @@ price: float    # 99.99
 - Exercise #6 (Support Triage) - **Signals (first introduction!)**, human-in-the-loop, multi-agent AI
 
 **Week 5+ (Advanced):**
+- Exercise #6a (Parallel Tickets) - **Parallel workflow execution**, Business identifier workflow IDs
 - Queries (read workflow state)
 - Parent-child workflows
 - Workflow versioning
 - Continue-as-new
 - Performance tuning
-- Parallel execution (fan-out/fan-in)
 
 ## Important Notes
 
@@ -267,3 +307,9 @@ price: float    # 99.99
 - Temporal Documentation: https://docs.temporal.io
 - Python SDK: https://docs.temporal.io/dev-guide/python
 - Java SDK: https://docs.temporal.io/dev-guide/java
+
+## Call To Action
+Every README should have the following CTA added after the ## Scenario
+## Quickstart Docs By Temporal
+
+🚀 [Get started in a few mins](https://docs.temporal.io/quickstarts?utm_campaign=awareness-nikolay-advolodkin&utm_medium=code&utm_source=github)
