@@ -3,158 +3,124 @@ package solution.temporal;
 import exercise.domain.Order;
 import io.temporal.activity.ActivityOptions;
 import io.temporal.common.RetryOptions;
+import io.temporal.failure.ActivityFailure;
 import io.temporal.workflow.Workflow;
 import org.slf4j.Logger;
+
 import solution.temporal.domain.OrderTrackingInfo;
 
 import java.time.Duration;
 
-public class OrderLifecycleWorkflowImpl implements OrderLifecycleWorkflow{
+public class OrderLifecycleWorkflowImpl implements OrderLifecycleWorkflow {
     private static final Logger logger = Workflow.getLogger(OrderLifecycleWorkflowImpl.class);
 
-    // 1. configure how activities should behave
+    // Workflow state — exposed via @QueryMethod
+    private String currentStatus = "CREATED";
+    private String paymentId;
+    private String reservationId;
+    private String trackingNumber;
+
+    // 1. Configure how activities should behave
     private static final ActivityOptions ACTIVITY_OPTIONS = ActivityOptions.newBuilder()
-            .setStartToCloseTimeout(Duration.ofSeconds(60))  // How long can one attempt take?
+            .setStartToCloseTimeout(Duration.ofSeconds(60)) //maximum time a single Activity attempt is allowed to run
             .setRetryOptions(RetryOptions.newBuilder()
-                    .setInitialInterval(Duration.ofSeconds(5)) // How long before first retry? 2 sec is better for LLM
-                    .setBackoffCoefficient(2)   // Multiply wait time by what?
+                    .setInitialInterval(Duration.ofSeconds(5))  //After the first failure, Temporal waits 5 seconds before the first retry attempt.
+                    .setBackoffCoefficient(2)   //Each subsequent retry delay is multiplied by 2
                     .build())
             .build();
 
-    //2. create activity stubs with non-existent @ActivityInterface. Using Workflow
-    private final OrderActivities validateOrderActivity = Workflow.newActivityStub(
+    // 2. Create activity stub
+    private final OrderActivities activities = Workflow.newActivityStub(
             OrderActivities.class, ACTIVITY_OPTIONS
     );
 
     @Override
     public String processOrder(Order order) {
-        System.out.println("\n" + "=".repeat(60));
-        System.out.println("Processing order: " + order.orderId);
-        System.out.println("=".repeat(60));
-
-        updateStatus(order.orderId, "CREATED");
+        logger.info("Processing order: {}", order.orderId);
+        currentStatus = "CREATED";
 
         // ---- Step 1: Validate Order ----
-        logger.info("\n[Step 1] Validating order...");
-        validateOrderActivity.validateOrder(order);
+        logger.info("[Step 1] Validating order...");
+        activities.validateOrder(order);
+        currentStatus = "VALIDATED";
+        logger.info("Order validated successfully");
 
-        // Before
-//        System.out.println("\n[Step 1] Validating order...");
-//        try {
-//            validateOrderActivity.validateOrder(order);
-//            updateStatus(order.orderId, "VALIDATED");
-//            System.out.println("  ✅ Order validated successfully");
-//        } catch (Exception e) {
-//            updateStatus(order.orderId, "VALIDATION_FAILED");
-//            System.out.println("  ❌ Validation failed: " + e.getMessage());
-//            return "FAILED: " + e.getMessage();
-//        }
+        try {
+            // ---- Step 2: Process Payment ----
+            logger.info("[Step 2] Processing payment...");
+            this.paymentId = activities.processPayment(order.orderId, order.customerEmail, order.getTotalAmount());
+            currentStatus = "PAID";
+            logger.info("Payment processed: {}", paymentId);
 
-        // ---- Step 2: Process Payment (with manual retry) ----
-        System.out.println("\n[Step 2] Processing payment...");
-        String paymentId = null;
-        int maxPaymentAttempts = 3;
-        for (int attempt = 1; attempt <= maxPaymentAttempts; attempt++) {
-            try {
-                paymentId = processPayment(order.orderId, order.customerEmail, order.getTotalAmount());
-                payments.put(order.orderId, paymentId);
-                updateStatus(order.orderId, "PAID");
-                System.out.println("  ✅ Payment processed: " + paymentId);
-                break;
-            } catch (Exception e) {
-                System.out.println("  ⚠️  Payment attempt " + attempt + "/" + maxPaymentAttempts + " failed: " + e.getMessage());
-                if (attempt == maxPaymentAttempts) {
-                    updateStatus(order.orderId, "PAYMENT_FAILED");
-                    System.out.println("  ❌ Payment failed after " + maxPaymentAttempts + " attempts");
-                    return "FAILED: Payment could not be processed";
-                }
-                // BUG: Thread.sleep in business logic
-                try { Thread.sleep(1000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+            // ---- Step 3: Reserve Inventory ----
+            logger.info("[Step 3] Reserving inventory...");
+            this.reservationId = activities.reserveInventory(order.orderId, order.items);
+            currentStatus = "FULFILLING";
+            logger.info("Inventory reserved: {}", reservationId);
+
+            // ---- Step 4: Create Shipment ----
+            logger.info("[Step 4] Creating shipment...");
+            this.trackingNumber = activities.createShipment(order.orderId, order.customerAddress);
+            currentStatus = "SHIPPED";
+            logger.info("Shipment created: {}", trackingNumber);
+
+        } catch (ActivityFailure e) {
+            logger.error("Order {} failed at status {}: {}", order.orderId, currentStatus, e.getMessage());
+            // Compensate in reverse order — only what succeeded
+            if (reservationId != null) {
+                logger.info("Compensating: releasing inventory {}", reservationId);
+                activities.releaseInventory(reservationId);
             }
+            if (paymentId != null) {
+                logger.info("Compensating: refunding payment {}", paymentId);
+                activities.refundPayment(paymentId);
+            }
+            currentStatus = "FAILED";
+            return "FAILED";
         }
 
-        // ---- Step 3: Reserve Inventory ----
-        System.out.println("\n[Step 3] Reserving inventory...");
-        String reservationId = null;
+        // ---- Step 5: Track Delivery ----
+        logger.info("[Step 5] Tracking delivery...");
+        currentStatus = "IN_TRANSIT";
         try {
-            reservationId = reserveInventory(order.orderId, order.items);
-            reservations.put(order.orderId, reservationId);
-            updateStatus(order.orderId, "FULFILLING");
-            System.out.println("  ✅ Inventory reserved: " + reservationId);
-        } catch (Exception e) {
-            // BUG: Payment was taken but inventory failed - no refund!
-            updateStatus(order.orderId, "INVENTORY_FAILED");
-            System.out.println("  ❌ Inventory reservation failed: " + e.getMessage());
-            System.out.println("  ⚠️  WARNING: Payment " + paymentId + " was charged but order cannot be fulfilled!");
-            System.out.println("  ⚠️  Customer needs manual refund!");
-            return "FAILED: Inventory unavailable (payment orphaned!)";
+            activities.sendNotification(order.customerEmail, order.orderId, "SHIPPED");
+        } catch (ActivityFailure e) {
+            logger.warn("Shipped notification failed (non-critical): {}", e.getMessage());
         }
 
-        // ---- Step 4: Create Shipment ----
-        System.out.println("\n[Step 4] Creating shipment...");
-        String trackingNumber = null;
-        try {
-            trackingNumber = createShipment(order.orderId, order.customerAddress);
-            shipments.put(order.orderId, trackingNumber);
-            updateStatus(order.orderId, "SHIPPED");
-            System.out.println("  ✅ Shipment created: " + trackingNumber);
-        } catch (Exception e) {
-            // BUG: Payment charged + inventory reserved but shipping failed - no compensation!
-            updateStatus(order.orderId, "SHIPPING_FAILED");
-            System.out.println("  ❌ Shipment creation failed: " + e.getMessage());
-            System.out.println("  ⚠️  WARNING: Payment charged AND inventory reserved but cannot ship!");
-            return "FAILED: Shipping unavailable (payment + inventory orphaned!)";
-        }
-
-        // ---- Step 5: Track Delivery (BLOCKING!) ----
-        System.out.println("\n[Step 5] Tracking delivery...");
-        updateStatus(order.orderId, "IN_TRANSIT");
-        sendNotification(order.customerEmail, order.orderId, "SHIPPED",
-                "Your order has shipped! Tracking: " + trackingNumber);
-
-        // BUG: This blocks the thread for potentially minutes (days in production!)
-        int maxChecks = 3 + (int) (Math.random() * 8);  // 3-10 checks (non-deterministic!)
+        int maxChecks = 20;
         for (int check = 1; check <= maxChecks; check++) {
-            System.out.println("  📦 Delivery check " + check + "/" + maxChecks + "...");
-            String deliveryStatus = checkDeliveryStatus(trackingNumber);
-            System.out.println("     Status: " + deliveryStatus);
+            String deliveryStatus = activities.checkDeliveryStatus(trackingNumber);
+            logger.info("Delivery check {}/{}: {}", check, maxChecks, deliveryStatus);
 
             if ("delivered".equals(deliveryStatus)) {
                 break;
             }
-
-            // BUG: Thread.sleep blocks this thread! In production this would be hours/days
-            try { Thread.sleep(2000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+            currentStatus = "out_for_delivery".equals(deliveryStatus) ? "OUT_FOR_DELIVERY" : "IN_TRANSIT";
+            Workflow.sleep(Duration.ofSeconds(10)); // Durable sleep — use minutes in production
         }
 
-        updateStatus(order.orderId, "DELIVERED");
+        currentStatus = "DELIVERED";
 
         // ---- Step 6: Send Delivery Notification ----
-        System.out.println("\n[Step 6] Sending delivery notification...");
+        logger.info("[Step 6] Sending delivery notification...");
         try {
-            sendNotification(order.customerEmail, order.orderId, "DELIVERED",
-                    "Your order has been delivered!");
-            System.out.println("  ✅ Delivery notification sent");
-        } catch (Exception e) {
-            // Non-critical failure - order is already delivered
-            System.out.println("  ⚠️  Notification failed (non-critical): " + e.getMessage());
+            activities.sendNotification(order.customerEmail, order.orderId, "DELIVERED");
+        } catch (ActivityFailure e) {
+            logger.warn("Delivery notification failed (non-critical): {}", e.getMessage());
         }
 
-        System.out.println("\n" + "=".repeat(60));
-        System.out.println("Order " + order.orderId + " completed! Final status: " + getOrderStatus(order.orderId));
-        System.out.println("=".repeat(60));
-
+        logger.info("Order {} completed!", order.orderId);
         return "SUCCESS";
     }
 
     @Override
     public String getOrderStatus() {
-        return "";
+        return currentStatus;
     }
 
     @Override
     public OrderTrackingInfo getTrackingInfo() {
-        return null;
+        return new OrderTrackingInfo(null, currentStatus, trackingNumber, paymentId, reservationId);
     }
-
 }
