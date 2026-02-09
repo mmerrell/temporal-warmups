@@ -45,10 +45,12 @@ Open `src/main/java/exercise/OrderLifecycleService.java` and look for these **pr
 After this exercise, you will be able to:
 
 1. **Implement `@QueryMethod`** to expose order status and tracking info to any external client
-2. **Convert blocking delivery polling** to a `Workflow.sleep()` + activity loop
-3. **Manage order status transitions** using workflow instance fields
-4. **Implement 8 activities** with appropriate retry policies
-5. **Add compensation** (refund payment + release inventory) when downstream steps fail
+2. **Use `WorkflowClient.start()`** to launch workflows non-blocking and query them while they run
+3. **Use `@SignalMethod`** for human-in-the-loop approval after payment
+4. **Convert blocking delivery polling** to a `Workflow.sleep()` + activity loop
+5. **Manage order status transitions** using workflow instance fields
+6. **Implement 8 activities** with appropriate retry policies
+7. **Add compensation** (refund payment + release inventory) when downstream steps fail
 
 ## Key Concepts
 
@@ -106,6 +108,86 @@ System.out.println("Current status: " + status);  // e.g., "IN_TRANSIT"
 - Must be **read-only** — no side effects, no activity calls, no `Workflow.sleep()`
 - Just return instance field values
 - Can be called at any time, even while workflow is sleeping during delivery tracking
+
+### Signals — Human-in-the-Loop Approval
+
+After payment is processed, the workflow pauses and waits for a human to approve the order before proceeding to inventory and shipping. This uses `@SignalMethod` — an external message sent INTO a running workflow.
+
+**In the workflow interface:**
+```java
+@SignalMethod
+void approveOrder();
+```
+
+**In the workflow implementation:**
+```java
+private boolean approvalReceived = false;
+
+@Override
+public void approveOrder() {
+    this.approvalReceived = true;  // Signal handler — just flip the flag
+}
+```
+
+**In `processOrder()`, after payment:**
+```java
+this.paymentId = activities.processPayment(...);
+currentStatus = "AWAITING_APPROVAL";
+
+// Workflow suspends here — durable, no thread held
+boolean approved = Workflow.await(Duration.ofMinutes(5), () -> approvalReceived);
+if (!approved) {
+    // Timeout — refund and fail
+    activities.refundPayment(paymentId);
+    currentStatus = "APPROVAL_TIMEOUT";
+    return "FAILED";
+}
+currentStatus = "APPROVED";
+// Continue to inventory reservation...
+```
+
+**Key points about Signals:**
+- `@SignalMethod` must return `void` — it's fire-and-forget
+- `Workflow.await()` is durable — survives worker crashes
+- Always use a timeout to avoid infinite waits
+- Signals are persisted — even if the workflow hasn't reached the `await` yet, the signal is stored and applied when it does
+
+#### Approving via Temporal CLI
+
+You can send the signal from the command line without writing any Java code:
+
+```bash
+# Approve a specific order
+temporal workflow signal --workflow-id order-ORD-001 --name approveOrder
+```
+
+#### Approving via Temporal UI
+
+1. Open http://localhost:8233
+2. Find the workflow (e.g., `order-ORD-001`)
+3. Click the workflow to open its detail page
+4. Click **Signal** in the top-right
+5. Enter signal name: `approveOrder`
+6. Click **Submit**
+
+#### Approving via Java (in Starter.java)
+
+```java
+// Get a handle to the running workflow and send the signal
+OrderLifecycleWorkflow handle = client.newWorkflowStub(
+        OrderLifecycleWorkflow.class, "order-" + order.orderId);
+handle.approveOrder();
+```
+
+#### Querying status while waiting for approval
+
+While the workflow is paused at `AWAITING_APPROVAL`, you can query it:
+
+```bash
+temporal workflow query --workflow-id order-ORD-001 --name getOrderStatus
+```
+
+This returns `"AWAITING_APPROVAL"` — demonstrating how Queries and Signals work together.
 
 ### Long-Running Workflows — Delivery Tracking
 
@@ -255,29 +337,68 @@ ActivityOptions notificationOptions = ActivityOptions.newBuilder()
 
 ### 6. Client/Starter — `Starter.java`
 
-- Start workflow with business ID: `"order-" + order.orderId` (e.g., `"order-ORD-001"`)
-- **After starting**, query the workflow to demonstrate real-time visibility:
+#### `WorkflowClient.start()` vs `workflow.processOrder()`
+
+There are two ways to call a workflow:
+
+| Method | Behavior | Returns |
+|--------|----------|---------|
+| `workflow.processOrder(order)` | **Blocking** — waits until the workflow finishes | The workflow result (`String`) |
+| `WorkflowClient.start(workflow::processOrder, order)` | **Non-blocking** — sends the request and returns immediately | `WorkflowExecution` (just the workflow ID + run ID) |
+
+For this exercise, use `WorkflowClient.start()` because:
+- Orders take a long time (delivery tracking can span days)
+- You want to **start the workflow and then query it** while it's still running
+- Blocking would defeat the purpose of demonstrating Queries
+
+#### Why Loop Over Orders?
+
+Each order needs its **own workflow stub** with a **unique workflow ID**. You can't reuse a stub — a stub is tied to one workflow execution. So the loop does 3 things per order:
+
+1. **Create a stub** with a business ID (`"order-" + order.orderId`)
+2. **Start the workflow** (non-blocking)
+3. Move on to the next order immediately
 
 ```java
-// Start the workflow
-WorkflowExecution exec = WorkflowClient.start(workflow::processOrder, order);
+// Loop 1: Start all workflows (non-blocking)
+for (Order order : orders) {
+    String workflowId = "order-" + order.orderId;
 
-// Query while it's running!
-Thread.sleep(2000);  // Wait a moment for it to start processing
-String status = client.newUntypedWorkflowStub(exec.getWorkflowId())
-        .query("getOrderStatus", String.class);
-System.out.println("Order status: " + status);
+    // Each order gets its OWN stub — you can't reuse stubs!
+    OrderLifecycleWorkflow workflow = client.newWorkflowStub(
+            OrderLifecycleWorkflow.class,
+            WorkflowOptions.newBuilder()
+                    .setTaskQueue("order-lifecycle")
+                    .setWorkflowId(workflowId)
+                    .build());
+
+    // Fire and forget — workflow runs on the worker, not here
+    WorkflowClient.start(workflow::processOrder, order);
+    System.out.println("Started workflow: " + workflowId);
+}
+
+// Loop 2: Query all workflows after a short delay
+Thread.sleep(3000);
+for (Order order : orders) {
+    String status = client.newUntypedWorkflowStub("order-" + order.orderId)
+            .query("getOrderStatus", String.class);
+    System.out.println(order.orderId + " status: " + status);
+}
 ```
+
+**Think of it like a restaurant:** `start()` is placing the order with the kitchen (and walking away). `processOrder()` would be standing at the counter until your food is ready. Queries are peeking through the kitchen window to see how your meal is progressing.
 
 ## Running Your Solution
 
 ### Terminal 1 — Start Worker
 ```bash
+cd exercise-1000-order-lifecycle
 mvn compile exec:java@worker
 ```
 
 ### Terminal 2 — Run Client
 ```bash
+cd exercise-1000-order-lifecycle
 mvn compile exec:java@client
 ```
 
@@ -304,6 +425,17 @@ Open http://localhost:8233 and look for:
 ### "Object is not JSON serializable" error
 **Cause:** Using enums, Date objects, or custom types as activity parameters/returns.
 **Fix:** Use simple types (String, int, double, List, POJO with default constructor).
+
+### `UnrecognizedPropertyException: Unrecognized field "totalAmount"`
+**Cause:** Jackson treats any `public getXxx()` method as a serializable property. So `getTotalAmount()` gets serialized as `"totalAmount"`, but on deserialization there's no matching field — and Jackson throws.
+**Fix:** Annotate computed getter methods with `@JsonIgnore`:
+```java
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+@JsonIgnore
+public double getTotalAmount() { ... }
+```
+**Rule of thumb:** If a `getXxx()` method computes a value rather than returning a field, it needs `@JsonIgnore`. Alternatively, rename it to not start with `get` (e.g., `computeTotalAmount()`).
 
 ### Compensation activities fail
 **Cause:** Compensation activities should be resilient — use generous retry policies for compensations.

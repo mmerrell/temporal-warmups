@@ -5,29 +5,11 @@ import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowOptions;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 public class Starter {
-    //1. set a task queue name in an interface for reuse
-
     //2. create main
-    public static void main(String[] args) {
-        //3. connect to temporal server
-        WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
-        WorkflowClient client = WorkflowClient.newInstance(service);
-        //4. create workflowId
-        String workflowId = SharedData.TASK_QUEUE + "-" + UUID.randomUUID();
-        //5. create a workflow stub
-        OrderLifecycleWorkflow workflow = client.newWorkflowStub(OrderLifecycleWorkflow.class,
-                WorkflowOptions.newBuilder()
-                        .setTaskQueue(SharedData.TASK_QUEUE)
-                        .setWorkflowId(workflowId)
-                        .build());
-
-        //6. call the workflow
+    public static void main(String[] args) throws InterruptedException {
         List<Order> orders = List.of(
                 new Order("ORD-001", "alice@example.com", "123 Main St, Springfield, IL 62701",
                         List.of(
@@ -45,11 +27,30 @@ public class Starter {
                         ))
         );
 
-        Map<String, String> results = new LinkedHashMap<>();
+        //3. connect to temporal server
+        WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
+        WorkflowClient client = WorkflowClient.newInstance(service);
 
         for (Order order : orders) {
-            String result = workflow.processOrder(order);
-            results.put(order.orderId, result);
+            // Each order gets its own stub with a unique business ID
+            String workflowId = "order-" + order.orderId;
+            OrderLifecycleWorkflow workflow = client.newWorkflowStub(
+                    OrderLifecycleWorkflow.class,
+                    WorkflowOptions.newBuilder()
+                            .setTaskQueue(SharedData.TASK_QUEUE)
+                            .setWorkflowId(workflowId)
+                            .build());
+
+            // Start workflow (non-blocking)
+            WorkflowClient.start(workflow::processOrder, order);
+            System.out.println("Started workflow: " + workflowId);
+        }
+
+        Thread.sleep(3000);
+        for (Order order : orders) {
+            String status = client.newUntypedWorkflowStub("order-" + order.orderId)
+                    .query("getOrderStatus", String.class);
+            System.out.println(order.orderId + " status: " + status);
         }
     }
 }

@@ -2,6 +2,7 @@ package solution.temporal;
 
 import exercise.domain.Order;
 import io.temporal.workflow.QueryMethod;
+import io.temporal.workflow.SignalMethod;
 import io.temporal.workflow.WorkflowInterface;
 import io.temporal.workflow.WorkflowMethod;
 import solution.temporal.domain.OrderTrackingInfo;
@@ -15,4 +16,6 @@ public interface OrderLifecycleWorkflow {
     String getOrderStatus();
     @QueryMethod
     OrderTrackingInfo getTrackingInfo();
+    @SignalMethod
+    void approveOrder();
 }

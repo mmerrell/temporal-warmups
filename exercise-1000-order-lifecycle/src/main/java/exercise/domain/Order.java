@@ -1,5 +1,7 @@
 package exercise.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +27,7 @@ public class Order {
         this.customerAddress = customerAddress;
         this.items = items != null ? items : new ArrayList<>();
     }
-
+    @JsonIgnore
     public double getTotalAmount() {
         return items.stream()
                 .mapToDouble(item -> item.price * item.quantity)

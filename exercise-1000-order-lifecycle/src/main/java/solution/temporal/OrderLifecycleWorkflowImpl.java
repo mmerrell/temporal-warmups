@@ -19,6 +19,7 @@ public class OrderLifecycleWorkflowImpl implements OrderLifecycleWorkflow {
     private String paymentId;
     private String reservationId;
     private String trackingNumber;
+    private boolean approvalReceived = false;
 
     // 1. Configure how activities should behave
     private static final ActivityOptions ACTIVITY_OPTIONS = ActivityOptions.newBuilder()
@@ -51,6 +52,18 @@ public class OrderLifecycleWorkflowImpl implements OrderLifecycleWorkflow {
             this.paymentId = activities.processPayment(order.orderId, order.customerEmail, order.getTotalAmount());
             currentStatus = "PAID";
             logger.info("Payment processed: {}", paymentId);
+
+            //wait for human approval
+            currentStatus = "AWAITING_APPROVAL";
+
+            boolean approved = Workflow.await(Duration.ofMinutes(5), () -> approvalReceived);
+            if (!approved) {
+                // Timeout — no one approved, refund and bail
+                activities.refundPayment(paymentId);
+                currentStatus = "APPROVAL_TIMEOUT";
+                return "FAILED";
+            }
+            currentStatus = "APPROVED";
 
             // ---- Step 3: Reserve Inventory ----
             logger.info("[Step 3] Reserving inventory...");
@@ -122,5 +135,10 @@ public class OrderLifecycleWorkflowImpl implements OrderLifecycleWorkflow {
     @Override
     public OrderTrackingInfo getTrackingInfo() {
         return new OrderTrackingInfo(null, currentStatus, trackingNumber, paymentId, reservationId);
+    }
+
+    @Override
+    public void approveOrder() {
+        this.approvalReceived = true;
     }
 }
