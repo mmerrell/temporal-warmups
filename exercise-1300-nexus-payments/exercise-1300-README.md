@@ -158,6 +158,72 @@ This exercise combines everything you've learned:
 
 Keep the dashboard running from Step 1 — when you start the Temporal workers later, the UI will automatically switch from the orange "Pre-Temporal Mode" to the green **"Temporal Nexus Mode"**.
 
+### How to Decompose: From Pre-Temporal to Temporal
+
+Before writing code, let's look at `PaymentProcessingService.java` and think about what goes where. The decomposition process is always the same three questions:
+
+#### Question 1: "What is the orchestration logic?"
+
+Look at the `for` loop in the pre-temporal code. Strip away the I/O and what's left is pure **decision-making**:
+
+```
+validate → if invalid, stop
+screen for fraud → check risk level
+categorize → record the category
+if high risk → need approval (but can't wait today!)
+execute payment
+```
+
+This sequence of decisions **IS your workflow**. It doesn't call APIs directly — it coordinates. It says "do this, then based on the result, do that." That's `PaymentProcessingWorkflowImpl`.
+
+#### Question 2: "What touches the outside world?"
+
+Scan the pre-temporal code for anything that could fail due to external factors:
+
+```java
+gateway.validatePayment(txn)          // ← calls payment gateway (could fail)
+fraudAgent.screenTransaction(req)     // ← calls OpenAI API (could fail, slow)
+categorizerAgent.categorize(catReq)   // ← calls OpenAI API (could fail, slow)
+gateway.executePayment(txn)           // ← calls payment gateway (could fail)
+```
+
+Every one of these is an **activity**. They do I/O. They can fail. They should be retried. Ask yourself: "If I unplugged the network cable, would this line break?" If yes → activity.
+
+#### Question 3: "Who owns what?"
+
+This is the Nexus question. Look at who owns each piece of business logic:
+
+```
+gateway.validatePayment()        → Payments team owns this
+fraudAgent.screenTransaction()   → Compliance team owns this ← CROSS-TEAM!
+categorizerAgent.categorize()    → Compliance team owns this ← CROSS-TEAM!
+gateway.executePayment()         → Payments team owns this
+```
+
+The Payments team shouldn't directly instantiate `FraudDetectionAgent` or `TransactionCategorizerAgent` — those belong to the Compliance team. In the pre-temporal code, they're tightly coupled. With Nexus, the Compliance team exposes a **service contract**, and the Payments team calls it like a remote API — but with durability, retries, and visibility built in.
+
+#### Putting It Together
+
+Here's how each line of pre-temporal code maps to the Temporal world:
+
+```
+PRE-TEMPORAL CODE                         TEMPORAL EQUIVALENT
+─────────────────────────────────────────────────────────────────────
+for (PaymentRequest txn : transactions)   PaymentStarter starts 5 workflows
+                                          (parallel, with business ID)
+
+  gateway.validatePayment(txn)            → PaymentActivity (local activity)
+  fraudAgent.screenTransaction(req)       → Nexus ASYNC call → FraudDetectionWorkflow
+  categorizerAgent.categorize(catReq)     → Nexus SYNC call → inline handler
+  if (riskResult.isRequiresApproval())    → Workflow.await() for Signal (NEW!)
+    // can't wait!                           (now we CAN wait — up to 24 hours)
+  gateway.executePayment(txn)             → PaymentActivity (local activity)
+```
+
+> **The golden rule:** Workflow code is the `if/else` logic. Activity code is anything that talks to the outside world. Nexus is how teams talk to each other without tight coupling.
+
+---
+
 The interfaces and domain classes are already provided. You'll implement the **7 files** marked with `// TODO` comments. Follow the phases below in order — each builds on the last.
 
 ### What's Already Provided (don't modify these)
