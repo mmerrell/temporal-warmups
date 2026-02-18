@@ -13,48 +13,87 @@ import io.temporal.nexus.WorkflowClientOperationHandlers;
 import shared.nexus.ComplianceNexusService;
 
 /**
- * [STUDENT IMPLEMENTS] Nexus Handler - the KEY new concept.
+ * YOUR TURN: Implement the Nexus service handler.
  *
- * This is where the Compliance team implements the Nexus service contract.
- * Think of it as: "How do we handle requests from the Payments team?"
+ * ═══════════════════════════════════════════════════════════════════
+ *  THIS IS THE KEY NEW FILE IN THIS EXERCISE
+ * ═══════════════════════════════════════════════════════════════════
  *
- * Two types of operation handlers:
+ * This class tells Temporal HOW to handle each Nexus operation.
+ * Two operations, two different handler styles:
  *
- * 1. WorkflowClientOperationHandlers.fromWorkflowMethod (ASYNC) - screenTransaction
- *    - Starts a full FraudDetectionWorkflow
- *    - Caller gets a handle to track progress
- *    - Long-running, durable, retryable
+ * METAPHOR: Think of this class as a "controller" in a REST API:
+ *   - The @Service interface (ComplianceNexusService) = the API route definition
+ *   - This @ServiceImpl class = the controller that handles requests
+ *   - ASYNC handler = "start a background job and return a ticket number"
+ *   - SYNC handler = "process this request and return the result right now"
  *
- * 2. WorkflowClientOperationHandlers.sync (SYNC) - categorizeTransaction
- *    - Runs inline with access to workflow client, returns immediately
- *    - Good for quick operations
- *    - Still goes through Temporal (logged, observed)
+ * ── Operation 1: screenTransaction (ASYNC) ──────────────────────
+ *
+ *   Async means: "start a workflow to handle this request."
+ *   The caller (Payments team) gets a handle to track the workflow's progress.
+ *
+ *   Use WorkflowClientOperationHandlers.fromWorkflowMethod():
+ *
+ *     return WorkflowClientOperationHandlers.fromWorkflowMethod(
+ *         (context, details, client, input) ->
+ *             client.newWorkflowStub(
+ *                 FraudDetectionWorkflow.class,
+ *                 WorkflowOptions.newBuilder()
+ *                     .setWorkflowId("fraud-screen-" + input.getTransactionId())
+ *                     .build()
+ *             )::screenTransaction
+ *     );
+ *
+ *   What this does:
+ *   1. Payments team calls screenTransaction() via Nexus
+ *   2. This handler creates a FraudDetectionWorkflow stub
+ *   3. Temporal starts that workflow on the Compliance side
+ *   4. The workflow ID "fraud-screen-TXN-001" is visible in Temporal UI
+ *   5. Payments team can track progress via the NexusOperationHandle
+ *
+ * ── Operation 2: categorizeTransaction (SYNC) ───────────────────
+ *
+ *   Sync means: "run this inline, return the result immediately."
+ *   No workflow is started — the operation completes in-place.
+ *
+ *   Use WorkflowClientOperationHandlers.sync():
+ *
+ *     return WorkflowClientOperationHandlers.sync(
+ *         (context, details, client, input) -> {
+ *             TransactionCategorizerAgent agent = new TransactionCategorizerAgent();
+ *             return agent.categorize(input);
+ *         });
+ *
+ * ANNOTATIONS:
+ *   - @ServiceImpl(service = ComplianceNexusService.class) on the class
+ *   - @OperationImpl on each handler method
+ *   - Handler method names MUST match the interface method names
  */
 @ServiceImpl(service = ComplianceNexusService.class)
 public class ComplianceNexusServiceImpl {
 
-    @OperationImpl
-    public OperationHandler<RiskScreeningRequest, RiskScreeningResult> screenTransaction() {
-        // ASYNC: Start a FraudDetectionWorkflow for each screening request
-        // fromWorkflowMethod maps a Nexus operation to a workflow method
-        return WorkflowClientOperationHandlers.fromWorkflowMethod(
-                (context, details, client, input) ->
-                        client.newWorkflowStub(
-                                FraudDetectionWorkflow.class,
-                                WorkflowOptions.newBuilder()
-                                        .setWorkflowId("fraud-screen-" + input.getTransactionId())
-                                        .build()
-                        )::screenTransaction
-        );
-    }
+    // TODO: Implement screenTransaction() — ASYNC handler
+    //   @OperationImpl
+    //   public OperationHandler<RiskScreeningRequest, RiskScreeningResult> screenTransaction() {
+    //       return WorkflowClientOperationHandlers.fromWorkflowMethod(
+    //           (context, details, client, input) ->
+    //               client.newWorkflowStub(
+    //                   FraudDetectionWorkflow.class,
+    //                   WorkflowOptions.newBuilder()
+    //                       .setWorkflowId("fraud-screen-" + input.getTransactionId())
+    //                       .build()
+    //               )::screenTransaction
+    //       );
+    //   }
 
-    @OperationImpl
-    public OperationHandler<CategoryRequest, TransactionCategory> categorizeTransaction() {
-        // SYNC: Quick categorization with access to workflow client
-        return WorkflowClientOperationHandlers.sync((context, details, client, input) -> {
-            System.out.println("[NexusHandler] Categorizing transaction: " + input.getTransactionId());
-            TransactionCategorizerAgent agent = new TransactionCategorizerAgent();
-            return agent.categorize(input);
-        });
-    }
+    // TODO: Implement categorizeTransaction() — SYNC handler
+    //   @OperationImpl
+    //   public OperationHandler<CategoryRequest, TransactionCategory> categorizeTransaction() {
+    //       return WorkflowClientOperationHandlers.sync(
+    //           (context, details, client, input) -> {
+    //               TransactionCategorizerAgent agent = new TransactionCategorizerAgent();
+    //               return agent.categorize(input);
+    //           });
+    //   }
 }

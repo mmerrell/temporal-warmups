@@ -19,154 +19,131 @@ import shared.nexus.ComplianceNexusService;
 import java.time.Duration;
 
 /**
- * [STUDENT IMPLEMENTS] Main payment processing workflow.
+ * YOUR TURN: Implement the main payment processing workflow.
  *
- * This is the Payments team's workflow that:
- * 1. Validates payment (local activity)
- * 2. Calls Compliance team via Nexus for categorization (SYNC Nexus call)
- * 3. Calls Compliance team via Nexus for fraud screening (ASYNC Nexus call)
- * 4. If high risk: waits for human approval via Signal (Ex 06 pattern)
- * 5. Executes payment (local activity)
+ * This is the BIG one — it combines everything from previous exercises
+ * plus the new Nexus concept:
  *
- * KEY NEW CONCEPT: Workflow.newNexusServiceStub() to call cross-team services
+ *   Step 1: Validate payment .............. local activity (same as Ex 01-04)
+ *   Step 2: Categorize transaction ........ Nexus SYNC call → Compliance team (NEW!)
+ *   Step 3: Screen for fraud .............. Nexus ASYNC call → Compliance team (NEW!)
+ *   Step 4: Wait for human approval ....... Signal + Workflow.await() (same as Ex 06)
+ *   Step 5: Execute payment ............... local activity (same as Ex 01-04)
+ *
+ * ═══════════════════════════════════════════════════════════════════
+ *  KEY NEW CONCEPT: Nexus Service Stub
+ * ═══════════════════════════════════════════════════════════════════
+ *
+ * Think of it like creating a REST client — but durable and type-safe:
+ *
+ *   ComplianceNexusService complianceService = Workflow.newNexusServiceStub(
+ *       ComplianceNexusService.class,
+ *       NexusServiceOptions.newBuilder()
+ *           .setOperationOptions(NexusOperationOptions.newBuilder()
+ *               .setScheduleToCloseTimeout(Duration.ofMinutes(5))
+ *               .build())
+ *           .build());
+ *
+ * Then call it like any local method:
+ *
+ *   // SYNC call (returns immediately):
+ *   TransactionCategory cat = complianceService.categorizeTransaction(catReq);
+ *
+ *   // ASYNC call (starts a workflow on the Compliance side):
+ *   NexusOperationHandle<RiskScreeningResult> handle =
+ *       Workflow.startNexusOperation(complianceService::screenTransaction, screenReq);
+ *   RiskScreeningResult result = handle.getResult().get();
+ *
+ * ═══════════════════════════════════════════════════════════════════
+ *  SIGNAL PATTERN (from Exercise 06)
+ * ═══════════════════════════════════════════════════════════════════
+ *
+ * For high-risk transactions, pause and wait for human approval:
+ *   - Track signal state with instance fields (approvalReceived, approved, etc.)
+ *   - Use Workflow.await(timeout, () -> approvalReceived) to wait
+ *   - The @SignalMethod sets the fields when a signal arrives
+ *
+ * ═══════════════════════════════════════════════════════════════════
  */
 public class PaymentProcessingWorkflowImpl implements PaymentProcessingWorkflow {
 
-    // Signal state for human-in-the-loop (same pattern as Exercise 06)
-    private boolean approvalReceived = false;
-    private boolean approved = false;
-    private String reviewerName = "";
-    private String approvalReason = "";
+    // ── Signal state for human-in-the-loop (Exercise 06 pattern) ──
+    // TODO: Add fields to track approval state:
+    //   private boolean approvalReceived = false;
+    //   private boolean approved = false;
+    //   private String reviewerName = "";
+    //   private String approvalReason = "";
 
-    // Activity options for local payment operations
-    private static final ActivityOptions ACTIVITY_OPTIONS = ActivityOptions.newBuilder()
-            .setStartToCloseTimeout(Duration.ofSeconds(30))
-            .setRetryOptions(RetryOptions.newBuilder()
-                    .setInitialInterval(Duration.ofSeconds(1))
-                    .setBackoffCoefficient(2)
-                    .setMaximumAttempts(5)
-                    .build())
-            .build();
+    // ── Activity stub for local payment operations ──
+    // TODO: Create ActivityOptions with:
+    //   - startToCloseTimeout: 30 seconds
+    //   - retryOptions: initialInterval=1s, backoff=2, maxAttempts=5
+    // TODO: Create activity stub:
+    //   private final PaymentActivity paymentActivity =
+    //       Workflow.newActivityStub(PaymentActivity.class, activityOptions);
 
-    // Local activity stub (Payments team)
-    private final PaymentActivity paymentActivity = Workflow.newActivityStub(
-            PaymentActivity.class, ACTIVITY_OPTIONS);
-
-    // KEY NEXUS CONCEPT: Create a Nexus service stub to call the Compliance team
-    // This is like creating a REST client, but durable and type-safe
-    // Note: The endpoint mapping ("ComplianceNexusService" -> "compliance-endpoint")
-    // is configured in the WORKER registration, not here. This keeps workflows portable.
-    private final ComplianceNexusService complianceService = Workflow.newNexusServiceStub(
-            ComplianceNexusService.class,
-            NexusServiceOptions.newBuilder()
-                    .setOperationOptions(NexusOperationOptions.newBuilder()
-                            .setScheduleToCloseTimeout(Duration.ofMinutes(5))
-                            .build())
-                    .build());
+    // ── KEY NEXUS CONCEPT: Nexus service stub for Compliance team ──
+    // TODO: Create the Nexus service stub (see javadoc above for the pattern)
+    //   private final ComplianceNexusService complianceService = ...
 
     @Override
     public PaymentResult processPayment(PaymentRequest request) {
+        // Use Workflow.getLogger() — NOT System.out.println()!
         Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
-                .info("Payment workflow started for: " + request.getTransactionId()
-                        + " | $" + String.format("%.2f", request.getAmount()));
+                .info("Payment workflow started for: " + request.getTransactionId());
 
         try {
-            // ============================================================
-            // Step 1: Validate payment (local activity - Payments team)
-            // ============================================================
-            boolean valid = paymentActivity.validatePayment(request);
-            if (!valid) {
-                return new PaymentResult(false, request.getTransactionId(), "REJECTED",
-                        null, null, null, "Payment validation failed");
-            }
+            // ════════════════════════════════════════════════════
+            // Step 1: Validate payment (local activity)
+            // ════════════════════════════════════════════════════
+            // TODO: Call paymentActivity.validatePayment(request)
+            //   If invalid, return PaymentResult(false, txnId, "REJECTED", ...)
 
-            // ============================================================
-            // Step 2: Categorize transaction via Nexus (SYNC - Compliance team)
-            // ============================================================
-            // This calls the Compliance team's categorizeTransaction() handler
-            // via Nexus. It's a synchronous operation - returns immediately.
-            Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
-                    .info("Calling Compliance team via Nexus for categorization...");
+            // ════════════════════════════════════════════════════
+            // Step 2: Categorize transaction via Nexus (SYNC)
+            // ════════════════════════════════════════════════════
+            // TODO:
+            //   1. Build a CategoryRequest from the PaymentRequest fields:
+            //      new CategoryRequest(txnId, amount, description, senderCountry, receiverCountry)
+            //   2. Call: complianceService.categorizeTransaction(catReq)
+            //      This is a SYNC Nexus call — it returns immediately.
+            //   3. Log the result
 
-            CategoryRequest catReq = new CategoryRequest(
-                    request.getTransactionId(), request.getAmount(),
-                    request.getDescription(), request.getSenderCountry(),
-                    request.getReceiverCountry());
+            // ════════════════════════════════════════════════════
+            // Step 3: Screen for fraud via Nexus (ASYNC)
+            // ════════════════════════════════════════════════════
+            // TODO:
+            //   1. Build a RiskScreeningRequest from the PaymentRequest fields
+            //   2. Start an ASYNC Nexus operation:
+            //      NexusOperationHandle<RiskScreeningResult> handle =
+            //          Workflow.startNexusOperation(complianceService::screenTransaction, screenReq);
+            //   3. Wait for the result:
+            //      RiskScreeningResult riskResult = handle.getResult().get();
+            //   4. Log the risk level and score
+            //
+            // WHY ASYNC? Fraud detection starts a full FraudDetectionWorkflow
+            // on the Compliance side. It could take minutes (AI analysis).
+            // The handle lets us track it and get the result when it's done.
 
-            TransactionCategory category = complianceService.categorizeTransaction(catReq);
+            // ════════════════════════════════════════════════════
+            // Step 4: Human approval for high-risk (Signal pattern)
+            // ════════════════════════════════════════════════════
+            // TODO:
+            //   if (riskResult.isRequiresApproval()) {
+            //       1. Log that we're waiting for approval
+            //       2. Wait: boolean received = Workflow.await(Duration.ofHours(24), () -> approvalReceived);
+            //       3. If !received → return timeout result
+            //       4. If !approved → return rejected result
+            //       5. If approved → log and continue to step 5
+            //   }
 
-            Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
-                    .info("Category: " + category.getCategory() + " (" + category.getSubCategory() + ")"
-                            + " | Regulatory: " + category.getRegulatoryFlags());
+            // ════════════════════════════════════════════════════
+            // Step 5: Execute payment (local activity)
+            // ════════════════════════════════════════════════════
+            // TODO: Call paymentActivity.executePayment(request)
+            //   Return PaymentResult(true, txnId, "COMPLETED", riskLevel, category, confirmationNumber, null)
 
-            // ============================================================
-            // Step 3: Screen for fraud via Nexus (ASYNC - Compliance team)
-            // ============================================================
-            // This starts a FraudDetectionWorkflow on the Compliance side.
-            // Async because fraud detection is a long-running operation.
-            Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
-                    .info("Calling Compliance team via Nexus for fraud screening...");
-
-            RiskScreeningRequest screenReq = new RiskScreeningRequest(
-                    request.getTransactionId(), request.getAmount(),
-                    request.getSenderCountry(), request.getReceiverCountry(),
-                    request.getDescription());
-
-            // Async Nexus pattern: start the operation and get a handle
-            // Then wait for the result. This starts a FraudDetectionWorkflow
-            // on the Compliance side via Nexus.
-            NexusOperationHandle<RiskScreeningResult> screenHandle =
-                    Workflow.startNexusOperation(complianceService::screenTransaction, screenReq);
-            RiskScreeningResult riskResult = screenHandle.getResult().get();
-
-            Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
-                    .info("Risk: " + riskResult.getRiskLevel() + " (score: " + riskResult.getRiskScore() + ")"
-                            + " | Sanctions: " + riskResult.isFlaggedSanctions());
-
-            // ============================================================
-            // Step 4: Human approval for high-risk transactions (Signal pattern from Ex 06)
-            // ============================================================
-            if (riskResult.isRequiresApproval()) {
-                Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
-                        .info("HIGH RISK - Waiting for human approval signal...");
-                Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
-                        .info("Send signal: temporal workflow signal --workflow-id payment-"
-                                + request.getTransactionId()
-                                + " --name approveTransaction --input "
-                                + "'{\"approved\":true,\"reviewerName\":\"Jane\",\"reason\":\"Verified\"}'");
-
-                // Wait for approval signal (same pattern as Exercise 06)
-                boolean signalReceived = Workflow.await(
-                        Duration.ofHours(24),
-                        () -> approvalReceived
-                );
-
-                if (!signalReceived) {
-                    return new PaymentResult(false, request.getTransactionId(), "TIMEOUT",
-                            riskResult.getRiskLevel(), category.getCategory(), null,
-                            "No approval received within 24 hours");
-                }
-
-                if (!approved) {
-                    return new PaymentResult(false, request.getTransactionId(), "REJECTED",
-                            riskResult.getRiskLevel(), category.getCategory(), null,
-                            "Rejected by " + reviewerName + ": " + approvalReason);
-                }
-
-                Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
-                        .info("Approved by " + reviewerName + ": " + approvalReason);
-            }
-
-            // ============================================================
-            // Step 5: Execute payment (local activity - Payments team)
-            // ============================================================
-            String confirmationNumber = paymentActivity.executePayment(request);
-
-            Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
-                    .info("Payment completed: " + confirmationNumber);
-
-            return new PaymentResult(true, request.getTransactionId(), "COMPLETED",
-                    riskResult.getRiskLevel(), category.getCategory(), confirmationNumber, null);
+            throw new UnsupportedOperationException("Implement the 5 steps above!");
 
         } catch (Exception e) {
             Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
@@ -178,13 +155,13 @@ public class PaymentProcessingWorkflowImpl implements PaymentProcessingWorkflow 
 
     @Override
     public void approveTransaction(ApprovalDecision decision) {
-        this.approved = decision.isApproved();
-        this.reviewerName = decision.getReviewerName();
-        this.approvalReason = decision.getReason();
-        this.approvalReceived = true;
-
-        Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
-                .info("Approval signal received: " + (decision.isApproved() ? "APPROVED" : "REJECTED")
-                        + " by " + decision.getReviewerName());
+        // TODO: Set the signal state fields:
+        //   this.approved = decision.isApproved();
+        //   this.reviewerName = decision.getReviewerName();
+        //   this.approvalReason = decision.getReason();
+        //   this.approvalReceived = true;
+        //
+        // REMEMBER: Signal methods must return void.
+        // The Workflow.await() in step 4 will unblock when approvalReceived becomes true.
     }
 }

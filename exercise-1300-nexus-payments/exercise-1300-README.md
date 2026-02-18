@@ -154,27 +154,180 @@ This exercise combines everything you've learned:
 - **Signals + Human-in-the-loop** (Ex 06) - approval for high-risk transactions
 - **Parallel execution + Business IDs** (Ex 06a) - 5 payments started concurrently
 
-## Files to Complete
+## Step 3: Implement Temporal Nexus (Step-by-Step)
 
-| File | Team | Purpose |
-|------|------|---------|
-| `shared/nexus/ComplianceNexusService.java` | Shared | Nexus service interface (contract) |
-| `compliance/temporal/activity/FraudDetectionActivity.java` | Compliance | Activity interface |
-| `compliance/temporal/activity/FraudDetectionActivityImpl.java` | Compliance | Activity implementation |
-| `compliance/temporal/FraudDetectionWorkflow.java` | Compliance | Workflow interface |
-| `compliance/temporal/FraudDetectionWorkflowImpl.java` | Compliance | Workflow implementation |
-| `compliance/temporal/ComplianceNexusServiceImpl.java` | Compliance | **Nexus handler (KEY)** |
-| `compliance/temporal/ComplianceWorkerApp.java` | Compliance | Worker with Nexus registration |
-| `payments/temporal/activity/PaymentActivity.java` | Payments | Activity interface |
-| `payments/temporal/activity/PaymentActivityImpl.java` | Payments | Activity implementation |
-| `payments/temporal/PaymentProcessingWorkflow.java` | Payments | Workflow interface + @SignalMethod |
-| `payments/temporal/PaymentProcessingWorkflowImpl.java` | Payments | **Main workflow (Nexus + Signals)** |
-| `payments/temporal/PaymentsWorkerApp.java` | Payments | Worker |
-| `payments/temporal/PaymentStarter.java` | Payments | Starts 5 payments in parallel |
+Keep the dashboard running from Step 1 — when you start the Temporal workers later, the UI will automatically switch from the orange "Pre-Temporal Mode" to the green **"Temporal Nexus Mode"**.
 
-## Step 3: Implement Temporal Nexus
+The interfaces and domain classes are already provided. You'll implement the **7 files** marked with `// TODO` comments. Follow the phases below in order — each builds on the last.
 
-Now convert the pre-Temporal baseline into durable Temporal Nexus workflows. Keep the dashboard running — when you start the Temporal workers and run the starter, the UI will automatically switch to the green **"Temporal Nexus Mode"** with richer workflow data.
+### What's Already Provided (don't modify these)
+
+| File | What it is |
+|------|-----------|
+| `shared/nexus/ComplianceNexusService.java` | Nexus service interface — the shared contract |
+| `compliance/temporal/FraudDetectionWorkflow.java` | Workflow interface |
+| `compliance/temporal/activity/FraudDetectionActivity.java` | Activity interface |
+| `payments/temporal/PaymentProcessingWorkflow.java` | Workflow interface + `@SignalMethod` |
+| `payments/temporal/activity/PaymentActivity.java` | Activity interface |
+| `compliance/temporal/ComplianceWorkerApp.java` | Compliance worker (fully wired) |
+| All `domain/` classes | Request/Response POJOs |
+
+---
+
+### Phase 1: Activities (Warm-up — same pattern as Exercises 01-04)
+
+Start with the simplest files to get back into the groove.
+
+**File 1: `compliance/temporal/activity/FraudDetectionActivityImpl.java`**
+- Constructor and field are provided
+- Implement `screenTransaction()`: delegate to `fraudAgent.screenTransaction(request)`
+- That's it — thin wrapper around the existing business logic
+
+**File 2: `payments/temporal/activity/PaymentActivityImpl.java`**
+- Constructor and field are provided
+- Implement `validatePayment()`: delegate to `gateway.validatePayment(request)`
+- Implement `executePayment()`: delegate to `gateway.executePayment(request)`
+
+> **Checkpoint:** These are pure delegation. If you've done Exercise 01, this is muscle memory.
+
+---
+
+### Phase 2: Compliance Workflow (same pattern as Exercises 01-04)
+
+**File 3: `compliance/temporal/FraudDetectionWorkflowImpl.java`**
+- Create an `ActivityOptions` with retry policy (hints in the TODOs)
+- Create an activity stub: `Workflow.newActivityStub(FraudDetectionActivity.class, options)`
+- In `screenTransaction()`: call the activity and return the result
+- Use `Workflow.getLogger()` for logging (NOT `System.out.println`)
+
+> **Checkpoint:** This workflow is called BY Nexus, but you don't need to know that yet. It's just a normal workflow that wraps an activity.
+
+---
+
+### Phase 3: The Nexus Handler (NEW CONCEPT)
+
+This is the heart of the exercise. Take your time here.
+
+**File 4: `compliance/temporal/ComplianceNexusServiceImpl.java`**
+
+Think of this like a **REST controller** — it receives requests from the Payments team and decides HOW to handle them:
+
+```
+Payments team calls Nexus          Nexus handler decides what to do
+─────────────────────────── ──►  ───────────────────────────────────
+screenTransaction(req)            → Start a FraudDetectionWorkflow (ASYNC)
+categorizeTransaction(req)        → Run categorization inline (SYNC)
+```
+
+**Two handler patterns to implement:**
+
+**ASYNC handler** — `screenTransaction()`:
+```java
+@OperationImpl
+public OperationHandler<RiskScreeningRequest, RiskScreeningResult> screenTransaction() {
+    return WorkflowClientOperationHandlers.fromWorkflowMethod(
+        (context, details, client, input) ->
+            client.newWorkflowStub(
+                FraudDetectionWorkflow.class,
+                WorkflowOptions.newBuilder()
+                    .setWorkflowId("fraud-screen-" + input.getTransactionId())
+                    .build()
+            )::screenTransaction     // ← method reference to the workflow method
+    );
+}
+```
+
+What this does:
+1. Payments team calls `screenTransaction()` via Nexus
+2. This handler creates a `FraudDetectionWorkflow` stub with a business ID
+3. Temporal starts that workflow on the Compliance side
+4. The Payments team gets a handle to track progress and wait for the result
+
+**SYNC handler** — `categorizeTransaction()`:
+```java
+@OperationImpl
+public OperationHandler<CategoryRequest, TransactionCategory> categorizeTransaction() {
+    return WorkflowClientOperationHandlers.sync(
+        (context, details, client, input) -> {
+            TransactionCategorizerAgent agent = new TransactionCategorizerAgent();
+            return agent.categorize(input);
+        });
+}
+```
+
+Sync is simpler — runs inline, returns immediately. Good for quick operations.
+
+> **When to use which?**
+> - **Async** (fromWorkflowMethod): Operation takes time, needs durability, benefits from its own event history. Think: fraud analysis, document processing, approval flows.
+> - **Sync**: Quick operation, doesn't need its own workflow. Think: categorization, validation, lookups.
+
+> **Checkpoint:** After this file, the Compliance side is complete. The `ComplianceWorkerApp.java` is already wired to register this handler via `worker.registerNexusServiceImplementation(new ComplianceNexusServiceImpl())`.
+
+---
+
+### Phase 4: The Payment Workflow (Nexus CALLER + Signals)
+
+**File 5: `payments/temporal/PaymentProcessingWorkflowImpl.java`**
+
+This is the biggest file — it orchestrates all 5 steps. But each step uses a pattern you already know:
+
+**New concept: Nexus service stub**
+```java
+private final ComplianceNexusService complianceService = Workflow.newNexusServiceStub(
+    ComplianceNexusService.class,
+    NexusServiceOptions.newBuilder()
+        .setOperationOptions(NexusOperationOptions.newBuilder()
+            .setScheduleToCloseTimeout(Duration.ofMinutes(5))
+            .build())
+        .build());
+```
+
+Then use it like a local method:
+
+| Step | Pattern | Code |
+|------|---------|------|
+| 1. Validate | Activity (Ex 01-04) | `paymentActivity.validatePayment(request)` |
+| 2. Categorize | **Nexus SYNC** (NEW) | `complianceService.categorizeTransaction(catReq)` |
+| 3. Fraud Screen | **Nexus ASYNC** (NEW) | `Workflow.startNexusOperation(complianceService::screenTransaction, req)` then `handle.getResult().get()` |
+| 4. Approval | Signal + await (Ex 06) | `Workflow.await(Duration.ofHours(24), () -> approvalReceived)` |
+| 5. Execute | Activity (Ex 01-04) | `paymentActivity.executePayment(request)` |
+
+The sync Nexus call (step 2) looks just like calling a regular method. The async call (step 3) uses `startNexusOperation` to get a handle, then `.getResult().get()` to wait.
+
+> **Checkpoint:** The workflow is complete. Now you need the worker and the starter.
+
+---
+
+### Phase 5: Worker + Starter (wiring it up)
+
+**File 6: `payments/temporal/PaymentsWorkerApp.java`**
+
+Standard worker pattern, but with one new twist — **Nexus endpoint mapping**:
+
+```java
+worker.registerWorkflowImplementationTypes(
+    WorkflowImplementationOptions.newBuilder()
+        .setNexusServiceOptions(Collections.singletonMap(
+            "ComplianceNexusService",              // Service interface name
+            NexusServiceOptions.newBuilder()
+                .setEndpoint("compliance-endpoint") // Matches the CLI endpoint
+                .build()))
+        .build(),
+    PaymentProcessingWorkflowImpl.class);
+```
+
+This tells the worker: "When PaymentProcessingWorkflow uses the ComplianceNexusService stub, route those calls to the `compliance-endpoint` Nexus endpoint."
+
+> **Analogy:** Like configuring `compliance.api.url=http://compliance:8080` in a Spring app. The workflow defines WHAT it calls, the worker config defines WHERE.
+
+**File 7: `payments/temporal/PaymentStarter.java`**
+
+Parallel execution pattern from Exercise 06a:
+- Loop through 5 transactions
+- For each: create a workflow stub with a business ID (`"payment-" + txnId`), start with `WorkflowClient.execute()` to get a `CompletableFuture`
+- Wait for all results
+
+> **Checkpoint:** All 7 files are complete. Time to run it!
 
 ## How to Run (Temporal Mode)
 
