@@ -26,26 +26,23 @@ public class ComplianceWorkerApp {
     private static final String TASK_QUEUE = "compliance-risk";
 
     public static void main(String[] args) {
-        // 1. Connect to Temporal
+        // C — Connect to Temporal
         WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
         WorkflowClient client = WorkflowClient.newInstance(service);
 
-        // 2. Create worker factory and worker
+        // R — Register workflow types
         WorkerFactory factory = WorkerFactory.newInstance(client);
         Worker worker = factory.newWorker(TASK_QUEUE);
-
-        // 3. Register workflows
         worker.registerWorkflowImplementationTypes(FraudDetectionWorkflowImpl.class);
 
-        // 4. Register activities with business logic (DI pattern)
+        // A — Activities (inject business logic dependencies)
         FraudDetectionAgent fraudAgent = new FraudDetectionAgent();
         worker.registerActivitiesImplementations(new FraudDetectionActivityImpl(fraudAgent));
 
-        // 5. KEY NEXUS CONCEPT: Register the Nexus service handler
-        // This tells the worker to handle incoming Nexus operation requests
+        // W — Wire Nexus service handler (handles incoming Nexus requests)
         worker.registerNexusServiceImplementation(new ComplianceNexusServiceImpl());
 
-        // 6. Start
+        // L — Launch!
         factory.start();
         System.out.println("==========================================================");
         System.out.println("  Compliance Worker started");

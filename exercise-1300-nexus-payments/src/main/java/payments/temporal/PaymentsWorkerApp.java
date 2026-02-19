@@ -7,6 +7,7 @@ import io.temporal.worker.WorkerFactory;
 import io.temporal.worker.WorkflowImplementationOptions;
 import io.temporal.workflow.NexusServiceOptions;
 import payments.PaymentGateway;
+import payments.TaskQueue;
 import payments.temporal.activity.PaymentActivityImpl;
 
 import java.util.Collections;
@@ -41,29 +42,27 @@ import java.util.Collections;
  * ANALOGY: Like a Spring @Value("${compliance.url}") — the workflow
  *          defines WHAT it calls, the worker config defines WHERE.
  *
- * Steps:
- *   1. Connect to Temporal (WorkflowServiceStubs + WorkflowClient)
- *   2. Create a WorkerFactory and Worker on task queue "payments-processing"
- *   3. Register PaymentProcessingWorkflowImpl WITH Nexus options (see above)
- *   4. Register PaymentActivityImpl with a PaymentGateway instance
- *   5. Start the factory
+ * Steps (CRAWL pattern — "Workers CRAWL before they run"):
+ *   C — Connect to Temporal (WorkflowServiceStubs + WorkflowClient)
+ *   R — Register PaymentProcessingWorkflowImpl WITH Nexus options (see above)
+ *   A — Activities: Register PaymentActivityImpl with a PaymentGateway instance
+ *   W — Wire Nexus endpoint mapping (setNexusServiceOptions)
+ *   L — Launch the factory (factory.start())
  *
  * Task queue: "payments-processing"
  */
 public class PaymentsWorkerApp {
 
-    private static final String TASK_QUEUE = "payments-processing";
-
     public static void main(String[] args) {
-        // TODO: 1. Connect to Temporal
-        //   WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
-        //   WorkflowClient client = WorkflowClient.newInstance(service);
+        // C — Connect to Temporal
+        WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
+        WorkflowClient client = WorkflowClient.newInstance(service);
 
-        // TODO: 2. Create worker factory and worker
-        //   WorkerFactory factory = WorkerFactory.newInstance(client);
-        //   Worker worker = factory.newWorker(TASK_QUEUE);
+        // R — Register workflow types (+ W — Wire Nexus endpoint mapping)
+        WorkerFactory factory = WorkerFactory.newInstance(client);
+        Worker worker = factory.newWorker(TaskQueue.TASK_QUEUE);
 
-        // TODO: 3. Register workflow WITH Nexus endpoint mapping
+        // TODO: Register workflow WITH Nexus endpoint mapping
         //   worker.registerWorkflowImplementationTypes(
         //       WorkflowImplementationOptions.newBuilder()
         //           .setNexusServiceOptions(
@@ -75,16 +74,18 @@ public class PaymentsWorkerApp {
         //           .build(),
         //       PaymentProcessingWorkflowImpl.class);
 
-        // TODO: 4. Register activities with business logic (DI pattern)
+        // A — Activities (inject business logic dependencies)
+        // TODO: Register activities
         //   PaymentGateway gateway = new PaymentGateway();
         //   worker.registerActivitiesImplementations(new PaymentActivityImpl(gateway));
 
-        // TODO: 5. Start the factory
+        // L — Launch!
+        // TODO: Start the factory
         //   factory.start();
 
         System.out.println("==========================================================");
         System.out.println("  Payments Worker started");
-        System.out.println("  Task Queue: " + TASK_QUEUE);
+        System.out.println("  Task Queue: " + TaskQueue.TASK_QUEUE);
         System.out.println("  Nexus Endpoint: compliance-endpoint -> ComplianceNexusService");
         System.out.println("  Handles: PaymentProcessingWorkflow");
         System.out.println("==========================================================");

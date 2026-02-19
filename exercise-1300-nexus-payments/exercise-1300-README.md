@@ -222,6 +222,99 @@ for (PaymentRequest txn : transactions)   PaymentStarter starts 5 workflows
 
 > **The golden rule:** Workflow code is the `if/else` logic. Activity code is anything that talks to the outside world. Nexus is how teams talk to each other without tight coupling.
 
+### Follow the Data
+
+Before diving into code, trace how data flows through the entire system. This follows **TXN-002** ($49,999, US → Cayman Islands) — the high-risk path that touches every hop.
+
+**[View animated data-flow diagram](http://localhost:3000/data-flow.svg)** — watch the orange ball move through all 8 hops (~30s loop).
+
+#### Hop-by-Hop Trace (TXN-002)
+
+**Hop 1: PaymentStarter.main() → PaymentProcessingWorkflow.processPayment()**
+```
+  Input:  PaymentRequest(TXN-002, $49,999, USD, US → Cayman Islands, "Offshore investment transfer")
+  What:   Starter creates workflow stub with ID "payment-TXN-002", calls WorkflowClient.execute()
+  Output: Workflow is now running on task queue "payments-processing"
+         │
+         ▼
+```
+
+**Hop 2: PaymentActivity.validatePayment()**
+```
+  Input:  PaymentRequest (same object passed through)
+  What:   Activity delegates to PaymentGateway.validatePayment() — checks amount > 0, accounts exist
+  Output: true (payment is valid)
+         │
+         ▼
+```
+
+**Hop 3: ── NEXUS SYNC ──► ComplianceNexusServiceImpl.categorizeTransaction()**
+```
+  Input:  CategoryRequest(TXN-002, $49,999, "Offshore investment transfer", US, Cayman Islands)
+  What:   Nexus sync handler runs inline — TransactionCategorizerAgent calls AI to classify
+  Output: TransactionCategory(category="INTL_TRANSFER", subCategory="OFFSHORE", regulatoryFlags=[...])
+         │
+         ▼
+```
+
+**Hop 4: ── NEXUS ASYNC ──► ComplianceNexusServiceImpl.screenTransaction()**
+```
+  Input:  RiskScreeningRequest(TXN-002, $49,999, US, Cayman Islands, "Offshore investment transfer")
+  What:   Nexus async handler starts FraudDetectionWorkflow with ID "fraud-screen-TXN-002"
+  Output: NexusOperationHandle — Payments workflow holds a handle, waits for the result
+         │
+         ▼
+```
+
+**Hop 5: FraudDetectionWorkflowImpl → FraudDetectionActivity → FraudDetectionAgent (AI)**
+```
+  Input:  RiskScreeningRequest (passed through from Hop 4)
+  What:   Workflow calls activity, activity delegates to FraudDetectionAgent which calls AI/LLM
+  Output: RiskScreeningResult(riskLevel="HIGH", riskScore=0.87, requiresApproval=true, flaggedSanctions=false)
+         │
+         ▼
+```
+
+**Hop 6: Workflow PAUSED ← Signal arrives**
+```
+  Input:  riskResult.isRequiresApproval() == true → Workflow.await(24h, () -> approvalReceived)
+  What:   Workflow is durably paused. Human sends signal via CLI or Approvals UI.
+  Signal: ApprovalDecision(approved=true, reviewerName="Jane", reason="Verified client identity")
+  Output: approvalReceived=true, approved=true → workflow unblocks
+         │
+         ▼
+```
+
+**Hop 7: PaymentActivity.executePayment()**
+```
+  Input:  PaymentRequest (original request)
+  What:   Activity delegates to PaymentGateway.executePayment() — processes the actual transfer
+  Output: "CONF-TXN-002-a1b2c3" (confirmation number)
+         │
+         ▼
+```
+
+**Hop 8: PaymentResult assembled → PaymentStarter**
+```
+  Input:  All values collected from previous hops
+  What:   Workflow constructs PaymentResult and returns it to the CompletableFuture in PaymentStarter
+  Output: PaymentResult(true, "TXN-002", "COMPLETED", "HIGH", "INTL_TRANSFER", "CONF-TXN-002-a1b2c3", null)
+```
+
+#### Reverse Lookup: Where Does Each PaymentResult Field Come From?
+
+```
+PaymentResult field          ← Where it comes from
+─────────────────────────    ──────────────────────────────────────────
+success (true)               ← reached Step 5 without exceptions
+transactionId ("TXN-002")   ← request.getTransactionId() (original input)
+status ("COMPLETED")         ← all steps passed (hardcoded in Step 5)
+riskLevel ("HIGH")           ← riskResult.getRiskLevel() (Hop 5 — Compliance team)
+category ("INTL_TRANSFER")   ← category.getCategory() (Hop 3 — Compliance team)
+confirmationNumber           ← paymentActivity.executePayment() return value (Hop 7)
+error (null)                 ← no exceptions thrown
+```
+
 ---
 
 The interfaces and domain classes are already provided. You'll implement the **7 files** marked with `// TODO` comments. Follow the phases below in order — each builds on the last.
@@ -346,7 +439,7 @@ PaymentProcessingWorkflow                        ComplianceNexusServiceImpl
 │  complianceService      │                      │  Runs inline:               │
 │    .categorize(catReq)  │                      │    agent.categorize(input)  │
 │                         │  ◄── result ──────── │    returns immediately      │
-│  category = result      │  TransactionCategory │                             │
+│  category = result      │  TransactionCategory │  (use this var in Steps 4&5)│
 │                         │                      │                             │
 │  STEP 3 (ASYNC)         │                      │  screenTransaction()        │
 │                         │  ── Nexus call ────► │                             │
@@ -516,9 +609,11 @@ CategoryRequest catReq = new CategoryRequest(
 TransactionCategory category = complianceService.categorizeTransaction(catReq);
 ```
 
-> **Watch out:** Use a different variable name than `request` — `catReq` works. Using `request` again would shadow the method parameter!
+> **Watch out — variable naming:**
+> - Don't name `CategoryRequest` as `request` — it shadows the method parameter! Use `catReq`.
+> - Whatever you name the `TransactionCategory` result (`category`, `transactionCategory`, etc.), **use that same name consistently** in Steps 4 and 5 when you call `.getCategory()` on it.
 
-The `category` result gives you: `category.getCategory()`, `category.getSubCategory()`, `category.getRegulatoryFlags()`
+The result gives you: `.getCategory()`, `.getSubCategory()`, `.getRegulatoryFlags()`
 
 **Step 3: Fraud screening via Nexus** (async call — new pattern)
 
@@ -612,8 +707,8 @@ PaymentRequest (input)
     ├─► Step 1: paymentActivity.validatePayment(request) → boolean
     │
     ├─► Step 2: new CategoryRequest(txnId, amount, description, sender, receiver)
-    │            complianceService.categorizeTransaction(catReq) → TransactionCategory
-    │            └── category.getCategory(), .getSubCategory(), .getRegulatoryFlags()
+    │            complianceService.categorizeTransaction(catReq) → TransactionCategory category
+    │            └── category.getCategory()  ← reused in Steps 4 and 5!
     │
     ├─► Step 3: new RiskScreeningRequest(txnId, amount, sender, receiver, description)
     │            Workflow.startNexusOperation(...) → handle → RiskScreeningResult
@@ -633,21 +728,33 @@ PaymentRequest (input)
 
 ### Phase 5: Worker + Starter (wiring it up)
 
+#### The CRAWL Pattern — Every Worker Follows These 5 Steps
+
+> **"Workers CRAWL before they run."**
+
+| Step | Letter | What you do | Code |
+|------|--------|-------------|------|
+| 1 | **C** — Connect | Connect to Temporal server | `WorkflowServiceStubs` + `WorkflowClient` |
+| 2 | **R** — Register | Register workflow types on the worker | `worker.registerWorkflowImplementationTypes(...)` |
+| 3 | **A** — Activities | Register activity implementations (inject dependencies) | `worker.registerActivitiesImplementations(...)` |
+| 4 | **W** — Wire | Wire up special config (Nexus endpoints, interceptors) | `setNexusServiceOptions(...)` or skip if none |
+| 5 | **L** — Launch | Launch the worker — start polling the task queue | `factory.start()` |
+
+For simple workers (no Nexus), skip **W** and it's just C-R-A-L. In this exercise, both workers use all 5 steps.
+
 **File 6: `payments/temporal/PaymentsWorkerApp.java`**
 
 Standard worker pattern from previous exercises. The full `main()` method:
 
 ```java
 public static void main(String[] args) {
-    // 1. Connect to Temporal
+    // C — Connect to Temporal
     WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
     WorkflowClient client = WorkflowClient.newInstance(service);
 
-    // 2. Create worker factory and worker
+    // R — Register workflow types (+ W — Wire Nexus endpoint mapping)
     WorkerFactory factory = WorkerFactory.newInstance(client);
     Worker worker = factory.newWorker(TASK_QUEUE);   // "payments-processing"
-
-    // 3. Register workflow WITH Nexus endpoint mapping (NEW PART)
     worker.registerWorkflowImplementationTypes(
             WorkflowImplementationOptions.newBuilder()
                     .setNexusServiceOptions(Collections.singletonMap(
@@ -658,11 +765,11 @@ public static void main(String[] args) {
                     .build(),
             PaymentProcessingWorkflowImpl.class);
 
-    // 4. Register activities with business logic (DI pattern)
+    // A — Activities (inject business logic dependencies)
     PaymentGateway gateway = new PaymentGateway();
     worker.registerActivitiesImplementations(new PaymentActivityImpl(gateway));
 
-    // 5. Start
+    // L — Launch!
     factory.start();
 }
 ```

@@ -128,7 +128,7 @@ public class PaymentProcessingWorkflowImpl implements PaymentProcessingWorkflow 
             boolean isValid = paymentActivity.validatePayment(request);
             if(!isValid){
                 return new PaymentResult(false, request.transactionId, "REJECTED",
-                        "", "", "", "");
+                        "", "", "", "Payment validation failed");
             }
             // ════════════════════════════════════════════════════
             // Step 2: Categorize transaction via Nexus (SYNC)
@@ -136,9 +136,9 @@ public class PaymentProcessingWorkflowImpl implements PaymentProcessingWorkflow 
             // TODO:
             //   1. Build a CategoryRequest from the PaymentRequest fields:
 
-                  CategoryRequest categoryRequest = new CategoryRequest(request.transactionId,
-                          request.getAmount(), request.getDescription(), request.getSenderCountry(),
-                          request.getReceiverCountry());
+              CategoryRequest categoryRequest = new CategoryRequest(request.transactionId,
+                      request.getAmount(), request.getDescription(), request.getSenderCountry(),
+                      request.getReceiverCountry());
             //   2. Call: complianceService.categorizeTransaction(catReq)
             //      This is a SYNC Nexus call — it returns immediately.
             TransactionCategory transactionCategory = complianceService.categorizeTransaction(categoryRequest);
@@ -151,14 +151,16 @@ public class PaymentProcessingWorkflowImpl implements PaymentProcessingWorkflow 
             // ════════════════════════════════════════════════════
             // TODO:
             //   1. Build a RiskScreeningRequest from the PaymentRequest fields
-
+            RiskScreeningRequest screeningRequest = new
+                    RiskScreeningRequest(request.getTransactionId(), request.getAmount(), request.getSenderCountry(), request.getReceiverCountry(), request.getDescription());
             //   2. Start an ASYNC Nexus operation:
-            //      NexusOperationHandle<RiskScreeningResult> handle =
-            //          Workflow.startNexusOperation(complianceService::screenTransaction, screenReq);
+                  NexusOperationHandle<RiskScreeningResult> handle =
+                      Workflow.startNexusOperation(complianceService::screenTransaction, screeningRequest);
             //   3. Wait for the result:
-            //      RiskScreeningResult riskResult = handle.getResult().get();
+                  RiskScreeningResult riskResult = handle.getResult().get();
             //   4. Log the risk level and score
-            //
+                Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
+                        .info(riskResult.toString());
             // WHY ASYNC? Fraud detection starts a full FraudDetectionWorkflow
             // on the Compliance side. It could take minutes (AI analysis).
             // The handle lets us track it and get the result when it's done.
@@ -167,21 +169,37 @@ public class PaymentProcessingWorkflowImpl implements PaymentProcessingWorkflow 
             // Step 4: Human approval for high-risk (Signal pattern)
             // ════════════════════════════════════════════════════
             // TODO:
-            //   if (riskResult.isRequiresApproval()) {
-            //       1. Log that we're waiting for approval
-            //       2. Wait: boolean received = Workflow.await(Duration.ofHours(24), () -> approvalReceived);
-            //       3. If !received → return timeout result
-            //       4. If !approved → return rejected result
-            //       5. If approved → log and continue to step 5
-            //   }
+            if (riskResult.isRequiresApproval()) {
+                Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
+                        .info("HIGH RISK - Waiting for human approval signal...");
+
+                // Block until signal arrives or 24 hours pass
+                boolean signalReceived = Workflow.await(
+                        Duration.ofHours(24),
+                        () -> approvalReceived   // ← this field is set by the @SignalMethod below
+                );
+
+                if (!signalReceived) {
+                    return new PaymentResult(false, request.getTransactionId(), "TIMEOUT",
+                            riskResult.getRiskLevel(), transactionCategory.getCategory(), null,
+                            "No approval received within 24 hours");
+                }
+                if (!approved) {
+                    return new PaymentResult(false, request.getTransactionId(), "REJECTED",
+                            riskResult.getRiskLevel(), transactionCategory.getCategory(), null,
+                            "Rejected by " + reviewerName + ": " + approvalReason);
+                }
+            }
 
             // ════════════════════════════════════════════════════
             // Step 5: Execute payment (local activity)
             // ════════════════════════════════════════════════════
             // TODO: Call paymentActivity.executePayment(request)
             //   Return PaymentResult(true, txnId, "COMPLETED", riskLevel, category, confirmationNumber, null)
-
-            throw new UnsupportedOperationException("Implement the 5 steps above!");
+            String confirmationNumber = paymentActivity.executePayment(request);
+            return new PaymentResult(true, request.getTransactionId(), "completed",
+                    riskResult.getRiskLevel(),
+                    transactionCategory.getCategory(), confirmationNumber, null);
 
         } catch (Exception e) {
             Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
@@ -194,11 +212,11 @@ public class PaymentProcessingWorkflowImpl implements PaymentProcessingWorkflow 
     @Override
     public void approveTransaction(ApprovalDecision decision) {
         // TODO: Set the signal state fields:
-        //   this.approved = decision.isApproved();
-        //   this.reviewerName = decision.getReviewerName();
-        //   this.approvalReason = decision.getReason();
-        //   this.approvalReceived = true;
-        //
+           this.approved = decision.isApproved();
+           this.reviewerName = decision.getReviewerName();
+           this.approvalReason = decision.getReason();
+           this.approvalReceived = true;
+
         // REMEMBER: Signal methods must return void.
         // The Workflow.await() in step 4 will unblock when approvalReceived becomes true.
     }
