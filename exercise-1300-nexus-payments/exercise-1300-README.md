@@ -242,31 +242,87 @@ The interfaces and domain classes are already provided. You'll implement the **7
 
 ### Phase 1: Activities (Warm-up — same pattern as Exercises 01-04)
 
-Start with the simplest files to get back into the groove.
+Start with the simplest files to get back into the groove. Activities are thin wrappers — they just bridge Temporal and your existing business logic.
 
 **File 1: `compliance/temporal/activity/FraudDetectionActivityImpl.java`**
-- Constructor and field are provided
-- Implement `screenTransaction()`: delegate to `fraudAgent.screenTransaction(request)`
-- That's it — thin wrapper around the existing business logic
+
+The constructor and `fraudAgent` field are already provided. You just need to fill in the method body:
+
+```java
+@Override
+public RiskScreeningResult screenTransaction(RiskScreeningRequest request) {
+    // One line: delegate to the agent and return the result
+    return fraudAgent.screenTransaction(request);
+}
+```
+
+That's it. The `FraudDetectionAgent` already knows how to call OpenAI and return a `RiskScreeningResult`. The activity just makes it retryable by Temporal.
 
 **File 2: `payments/temporal/activity/PaymentActivityImpl.java`**
-- Constructor and field are provided
-- Implement `validatePayment()`: delegate to `gateway.validatePayment(request)`
-- Implement `executePayment()`: delegate to `gateway.executePayment(request)`
 
-> **Checkpoint:** These are pure delegation. If you've done Exercise 01, this is muscle memory.
+Same pattern — the constructor and `gateway` field are provided. Two methods, each a one-liner:
+
+```java
+@Override
+public boolean validatePayment(PaymentRequest request) {
+    return gateway.validatePayment(request);
+}
+
+@Override
+public String executePayment(PaymentRequest request) {
+    return gateway.executePayment(request);  // Returns a confirmation number like "CONF-TXN-001-..."
+}
+```
+
+> **Why are these so simple?** Activities should be thin. The business logic lives in `FraudDetectionAgent` and `PaymentGateway` — those are plain Java classes that don't know about Temporal. The activity is just the bridge that lets Temporal retry, timeout, and track these calls.
+
+> **Checkpoint:** If you've done Exercise 01, this is muscle memory. Two files, a few lines each.
 
 ---
 
 ### Phase 2: Compliance Workflow (same pattern as Exercises 01-04)
 
 **File 3: `compliance/temporal/FraudDetectionWorkflowImpl.java`**
-- Create an `ActivityOptions` with retry policy (hints in the TODOs)
-- Create an activity stub: `Workflow.newActivityStub(FraudDetectionActivity.class, options)`
-- In `screenTransaction()`: call the activity and return the result
-- Use `Workflow.getLogger()` for logging (NOT `System.out.println`)
 
-> **Checkpoint:** This workflow is called BY Nexus, but you don't need to know that yet. It's just a normal workflow that wraps an activity.
+This workflow wraps the fraud detection activity with retry policies. Three things to set up:
+
+**1. Activity options** (class-level constant):
+```java
+private static final ActivityOptions ACTIVITY_OPTIONS = ActivityOptions.newBuilder()
+        .setStartToCloseTimeout(Duration.ofSeconds(60))   // OpenAI can be slow
+        .setRetryOptions(RetryOptions.newBuilder()
+                .setInitialInterval(Duration.ofSeconds(2)) // Wait 2s before first retry
+                .setBackoffCoefficient(2)                  // Double the wait each retry
+                .setMaximumAttempts(5)                      // Give up after 5 tries
+                .build())
+        .build();
+```
+
+**2. Activity stub** (class-level field):
+```java
+private final FraudDetectionActivity fraudActivity =
+        Workflow.newActivityStub(FraudDetectionActivity.class, ACTIVITY_OPTIONS);
+```
+
+**3. Method body** — call the activity and return the result:
+```java
+@Override
+public RiskScreeningResult screenTransaction(RiskScreeningRequest request) {
+    Workflow.getLogger(FraudDetectionWorkflowImpl.class)
+            .info("Fraud detection started for: " + request.getTransactionId());
+
+    RiskScreeningResult result = fraudActivity.screenTransaction(request);
+
+    Workflow.getLogger(FraudDetectionWorkflowImpl.class)
+            .info("Result: " + result.getRiskLevel() + " (score: " + result.getRiskScore() + ")");
+
+    return result;
+}
+```
+
+> **Why `Workflow.getLogger()` instead of `System.out.println()`?** Workflows can be replayed (that's how Temporal recovers from crashes). During replay, `println` would print again, cluttering your logs. `Workflow.getLogger()` is replay-safe — it only logs during the first execution.
+
+> **Checkpoint:** This workflow is called BY Nexus (from Phase 3), but you don't need to know that yet. It's just a normal workflow that wraps an activity. If you've done Exercise 01-04, this is the same pattern.
 
 ---
 
@@ -335,30 +391,206 @@ Sync is simpler — runs inline, returns immediately. Good for quick operations.
 
 **File 5: `payments/temporal/PaymentProcessingWorkflowImpl.java`**
 
-This is the biggest file — it orchestrates all 5 steps. But each step uses a pattern you already know:
+This is the biggest file — it orchestrates all 5 steps. Take it one step at a time. The method signature is:
 
-**New concept: Nexus service stub**
 ```java
-private final ComplianceNexusService complianceService = Workflow.newNexusServiceStub(
-    ComplianceNexusService.class,
-    NexusServiceOptions.newBuilder()
-        .setOperationOptions(NexusOperationOptions.newBuilder()
-            .setScheduleToCloseTimeout(Duration.ofMinutes(5))
-            .build())
-        .build());
+public PaymentResult processPayment(PaymentRequest request) { ... }
 ```
 
-Then use it like a local method:
+Everything you need comes from `request` (the `PaymentRequest` passed in). Here's a quick reference of what's available:
 
-| Step | Pattern | Code |
-|------|---------|------|
-| 1. Validate | Activity (Ex 01-04) | `paymentActivity.validatePayment(request)` |
-| 2. Categorize | **Nexus SYNC** (NEW) | `complianceService.categorizeTransaction(catReq)` |
-| 3. Fraud Screen | **Nexus ASYNC** (NEW) | `Workflow.startNexusOperation(complianceService::screenTransaction, req)` then `handle.getResult().get()` |
-| 4. Approval | Signal + await (Ex 06) | `Workflow.await(Duration.ofHours(24), () -> approvalReceived)` |
-| 5. Execute | Activity (Ex 01-04) | `paymentActivity.executePayment(request)` |
+```
+request.getTransactionId()    → "TXN-001"
+request.getAmount()           → 250.00
+request.getDescription()      → "Monthly rent payment"
+request.getSenderCountry()    → "US"
+request.getReceiverCountry()  → "US"
+request.getCurrency()         → "USD"
+request.getSenderAccount()    → "ACC-SENDER-001"
+request.getReceiverAccount()  → "ACC-RECV-001"
+```
 
-The sync Nexus call (step 2) looks just like calling a regular method. The async call (step 3) uses `startNexusOperation` to get a handle, then `.getResult().get()` to wait.
+#### Setting up the class fields (before the method)
+
+You need three things declared as fields at the top of the class:
+
+**1. Signal state** — instance fields to track the human approval (Exercise 06 pattern):
+```java
+private boolean approvalReceived = false;
+private boolean approved = false;
+private String reviewerName = "";
+private String approvalReason = "";
+```
+
+**2. Activity stub** — for local payment operations (Exercise 01-04 pattern):
+```java
+private static final ActivityOptions ACTIVITY_OPTIONS = ActivityOptions.newBuilder()
+        .setStartToCloseTimeout(Duration.ofSeconds(30))
+        .setRetryOptions(RetryOptions.newBuilder()
+                .setInitialInterval(Duration.ofSeconds(1))
+                .setBackoffCoefficient(2)
+                .setMaximumAttempts(5)
+                .build())
+        .build();
+
+private final PaymentActivity paymentActivity =
+        Workflow.newActivityStub(PaymentActivity.class, ACTIVITY_OPTIONS);
+```
+
+**3. Nexus service stub** — to call the Compliance team (NEW):
+```java
+private final ComplianceNexusService complianceService = Workflow.newNexusServiceStub(
+        ComplianceNexusService.class,
+        NexusServiceOptions.newBuilder()
+                .setOperationOptions(NexusOperationOptions.newBuilder()
+                        .setScheduleToCloseTimeout(Duration.ofMinutes(5))
+                        .build())
+                .build());
+```
+
+> **Think of it this way:** The activity stub talks to YOUR team's activities. The Nexus stub talks to the OTHER team's services. Both look like regular method calls.
+
+#### Step-by-step implementation of `processPayment()`
+
+**Step 1: Validate payment** (activity call — you know this)
+
+```java
+boolean valid = paymentActivity.validatePayment(request);
+if (!valid) {
+    return new PaymentResult(false, request.getTransactionId(), "REJECTED",
+            null, null, null, "Payment validation failed");
+}
+```
+
+**Step 2: Categorize via Nexus** (sync call — looks like a regular method)
+
+You need to build a `CategoryRequest` from the `PaymentRequest` values. The constructor is:
+```
+CategoryRequest(transactionId, amount, description, senderCountry, receiverCountry)
+```
+
+So you map from `request`:
+```java
+CategoryRequest catReq = new CategoryRequest(
+        request.getTransactionId(),      // transactionId
+        request.getAmount(),             // amount
+        request.getDescription(),        // description
+        request.getSenderCountry(),      // senderCountry
+        request.getReceiverCountry()     // receiverCountry
+);
+TransactionCategory category = complianceService.categorizeTransaction(catReq);
+```
+
+> **Watch out:** Use a different variable name than `request` — `catReq` works. Using `request` again would shadow the method parameter!
+
+The `category` result gives you: `category.getCategory()`, `category.getSubCategory()`, `category.getRegulatoryFlags()`
+
+**Step 3: Fraud screening via Nexus** (async call — new pattern)
+
+Build a `RiskScreeningRequest`. The constructor is:
+```
+RiskScreeningRequest(transactionId, amount, senderCountry, receiverCountry, description)
+```
+
+> **Note:** The parameter order is different from `CategoryRequest`! `CategoryRequest` has `description` third, `RiskScreeningRequest` has it last. Check the constructors if unsure (Ctrl+click in your IDE).
+
+```java
+RiskScreeningRequest screenReq = new RiskScreeningRequest(
+        request.getTransactionId(),      // transactionId
+        request.getAmount(),             // amount
+        request.getSenderCountry(),      // senderCountry
+        request.getReceiverCountry(),    // receiverCountry
+        request.getDescription()         // description (last!)
+);
+```
+
+Now the async Nexus call — two lines:
+```java
+NexusOperationHandle<RiskScreeningResult> handle =
+        Workflow.startNexusOperation(complianceService::screenTransaction, screenReq);
+RiskScreeningResult riskResult = handle.getResult().get();
+```
+
+Line 1 starts a `FraudDetectionWorkflow` on the Compliance side (via the Nexus handler you built in Phase 3). Line 2 waits for that workflow to complete and gives you the result.
+
+The `riskResult` gives you: `riskResult.getRiskLevel()`, `riskResult.getRiskScore()`, `riskResult.isRequiresApproval()`, `riskResult.isFlaggedSanctions()`
+
+**Step 4: Human approval** (signal pattern — Exercise 06)
+
+Only needed if the risk level requires approval:
+
+```java
+if (riskResult.isRequiresApproval()) {
+    Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
+            .info("HIGH RISK - Waiting for human approval signal...");
+
+    // Block until signal arrives or 24 hours pass
+    boolean signalReceived = Workflow.await(
+            Duration.ofHours(24),
+            () -> approvalReceived   // ← this field is set by the @SignalMethod below
+    );
+
+    if (!signalReceived) {
+        return new PaymentResult(false, request.getTransactionId(), "TIMEOUT",
+                riskResult.getRiskLevel(), category.getCategory(), null,
+                "No approval received within 24 hours");
+    }
+    if (!approved) {
+        return new PaymentResult(false, request.getTransactionId(), "REJECTED",
+                riskResult.getRiskLevel(), category.getCategory(), null,
+                "Rejected by " + reviewerName + ": " + approvalReason);
+    }
+}
+```
+
+> **How it works:** `Workflow.await()` pauses the workflow (durably — survives crashes!). When someone sends a signal via CLI or the Approvals page, your `@SignalMethod` sets `approvalReceived = true`, which unblocks the `await()`. This is the pattern from Exercise 06.
+
+**Step 5: Execute payment** (activity call — you know this)
+
+```java
+String confirmationNumber = paymentActivity.executePayment(request);
+return new PaymentResult(true, request.getTransactionId(), "COMPLETED",
+        riskResult.getRiskLevel(), category.getCategory(), confirmationNumber, null);
+```
+
+#### Don't forget the `@SignalMethod`
+
+The `approveTransaction` method receives the approval signal and sets the fields that `Workflow.await()` checks:
+
+```java
+@Override
+public void approveTransaction(ApprovalDecision decision) {
+    this.approved = decision.isApproved();
+    this.reviewerName = decision.getReviewerName();
+    this.approvalReason = decision.getReason();
+    this.approvalReceived = true;  // ← this unblocks the await()
+}
+```
+
+#### Data flow cheat sheet
+
+Here's how data flows through the whole workflow:
+
+```
+PaymentRequest (input)
+    │
+    ├─► Step 1: paymentActivity.validatePayment(request) → boolean
+    │
+    ├─► Step 2: new CategoryRequest(txnId, amount, description, sender, receiver)
+    │            complianceService.categorizeTransaction(catReq) → TransactionCategory
+    │            └── category.getCategory(), .getSubCategory(), .getRegulatoryFlags()
+    │
+    ├─► Step 3: new RiskScreeningRequest(txnId, amount, sender, receiver, description)
+    │            Workflow.startNexusOperation(...) → handle → RiskScreeningResult
+    │            └── riskResult.getRiskLevel(), .getRiskScore(), .isRequiresApproval()
+    │
+    ├─► Step 4: if (riskResult.isRequiresApproval())
+    │                Workflow.await(24h, () -> approvalReceived)
+    │                ← approveTransaction() signal sets the fields
+    │
+    └─► Step 5: paymentActivity.executePayment(request) → String confirmationNumber
+                 return new PaymentResult(success, txnId, status, riskLevel, category, conf, error)
+```
 
 > **Checkpoint:** The workflow is complete. Now you need the worker and the starter.
 
@@ -368,30 +600,79 @@ The sync Nexus call (step 2) looks just like calling a regular method. The async
 
 **File 6: `payments/temporal/PaymentsWorkerApp.java`**
 
-Standard worker pattern, but with one new twist — **Nexus endpoint mapping**:
+Standard worker pattern from previous exercises. The full `main()` method:
 
 ```java
-worker.registerWorkflowImplementationTypes(
-    WorkflowImplementationOptions.newBuilder()
-        .setNexusServiceOptions(Collections.singletonMap(
-            "ComplianceNexusService",              // Service interface name
-            NexusServiceOptions.newBuilder()
-                .setEndpoint("compliance-endpoint") // Matches the CLI endpoint
-                .build()))
-        .build(),
-    PaymentProcessingWorkflowImpl.class);
+public static void main(String[] args) {
+    // 1. Connect to Temporal
+    WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
+    WorkflowClient client = WorkflowClient.newInstance(service);
+
+    // 2. Create worker factory and worker
+    WorkerFactory factory = WorkerFactory.newInstance(client);
+    Worker worker = factory.newWorker(TASK_QUEUE);   // "payments-processing"
+
+    // 3. Register workflow WITH Nexus endpoint mapping (NEW PART)
+    worker.registerWorkflowImplementationTypes(
+            WorkflowImplementationOptions.newBuilder()
+                    .setNexusServiceOptions(Collections.singletonMap(
+                            "ComplianceNexusService",
+                            NexusServiceOptions.newBuilder()
+                                    .setEndpoint("compliance-endpoint")
+                                    .build()))
+                    .build(),
+            PaymentProcessingWorkflowImpl.class);
+
+    // 4. Register activities with business logic (DI pattern)
+    PaymentGateway gateway = new PaymentGateway();
+    worker.registerActivitiesImplementations(new PaymentActivityImpl(gateway));
+
+    // 5. Start
+    factory.start();
+}
 ```
 
-This tells the worker: "When PaymentProcessingWorkflow uses the ComplianceNexusService stub, route those calls to the `compliance-endpoint` Nexus endpoint."
+The only new thing is step 3 — instead of the simple `worker.registerWorkflowImplementationTypes(MyWorkflow.class)` from previous exercises, we add a `NexusServiceOptions` map. This tells Temporal: "When this workflow uses a `ComplianceNexusService` stub, route those calls to the `compliance-endpoint` that we registered via CLI."
 
 > **Analogy:** Like configuring `compliance.api.url=http://compliance:8080` in a Spring app. The workflow defines WHAT it calls, the worker config defines WHERE.
 
+> **Compare with `ComplianceWorkerApp.java`** (already provided): That worker registers `registerNexusServiceImplementation(new ComplianceNexusServiceImpl())` to HANDLE incoming Nexus requests. This worker registers `setNexusServiceOptions(...)` to SEND outgoing Nexus requests. Handler side vs caller side.
+
 **File 7: `payments/temporal/PaymentStarter.java`**
 
-Parallel execution pattern from Exercise 06a:
-- Loop through 5 transactions
-- For each: create a workflow stub with a business ID (`"payment-" + txnId`), start with `WorkflowClient.execute()` to get a `CompletableFuture`
-- Wait for all results
+This starts all 5 payment workflows in parallel. The core loop:
+
+```java
+WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
+WorkflowClient client = WorkflowClient.newInstance(service);
+
+List<CompletableFuture<PaymentResult>> futures = new ArrayList<>();
+
+for (PaymentRequest txn : transactions) {
+    // Business ID workflow ID: "payment-TXN-001" (not a random UUID!)
+    String workflowId = "payment-" + txn.getTransactionId();
+
+    PaymentProcessingWorkflow workflow = client.newWorkflowStub(
+            PaymentProcessingWorkflow.class,
+            WorkflowOptions.newBuilder()
+                    .setTaskQueue(TASK_QUEUE)       // "payments-processing"
+                    .setWorkflowId(workflowId)      // "payment-TXN-001"
+                    .build());
+
+    // execute() returns a CompletableFuture — starts the workflow without blocking
+    futures.add(WorkflowClient.execute(workflow::processPayment, txn));
+}
+```
+
+Then wait for results:
+```java
+for (int i = 0; i < futures.size(); i++) {
+    PaymentResult result = futures.get(i).get();  // blocks until this workflow completes
+    System.out.println(result.getTransactionId() + " → " + result.getStatus());
+}
+```
+
+> **Heads up:** Low-risk transactions (TXN-001, TXN-003) will complete quickly. But high-risk ones (TXN-002, TXN-004, TXN-005) will BLOCK here waiting for approval signals. That's expected! Send signals from another terminal (see "Terminal 7" below) and watch them unblock one by one.
 
 > **Checkpoint:** All 7 files are complete. Time to run it!
 

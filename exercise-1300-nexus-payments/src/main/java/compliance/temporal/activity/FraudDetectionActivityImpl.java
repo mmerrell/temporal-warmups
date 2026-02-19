@@ -35,6 +35,6 @@ public class FraudDetectionActivityImpl implements FraudDetectionActivity {
         // TODO: Delegate to the fraud agent and return the result
         //   - Call fraudAgent.screenTransaction(request)
         //   - Optionally log: "[FraudDetectionActivity] Screening: " + request.getTransactionId()
-        throw new UnsupportedOperationException("Implement me!");
+        return fraudAgent.screenTransaction(request);
     }
 }

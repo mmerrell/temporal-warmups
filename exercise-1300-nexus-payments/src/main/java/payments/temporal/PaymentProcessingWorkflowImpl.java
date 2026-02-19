@@ -69,22 +69,49 @@ public class PaymentProcessingWorkflowImpl implements PaymentProcessingWorkflow 
 
     // ── Signal state for human-in-the-loop (Exercise 06 pattern) ──
     // TODO: Add fields to track approval state:
-    //   private boolean approvalReceived = false;
-    //   private boolean approved = false;
-    //   private String reviewerName = "";
-    //   private String approvalReason = "";
+       private boolean approvalReceived = false;
+       private boolean approved = false;
+       private String reviewerName = "";
+       private String approvalReason = "";
 
     // ── Activity stub for local payment operations ──
     // TODO: Create ActivityOptions with:
     //   - startToCloseTimeout: 30 seconds
     //   - retryOptions: initialInterval=1s, backoff=2, maxAttempts=5
+    private static final ActivityOptions ACTIVITY_OPTIONS = ActivityOptions.newBuilder()
+            .setStartToCloseTimeout(Duration.ofSeconds(60))  // How long can one attempt take?
+            .setRetryOptions(RetryOptions.newBuilder()
+                    .setInitialInterval(Duration.ofSeconds(5)) // How long before first retry? 2 sec is better for LLM
+                    .setBackoffCoefficient(2)   // Multiply wait time by what?
+                    .build())
+            .build();
     // TODO: Create activity stub:
-    //   private final PaymentActivity paymentActivity =
-    //       Workflow.newActivityStub(PaymentActivity.class, activityOptions);
+   private final PaymentActivity paymentActivity =
+       Workflow.newActivityStub(PaymentActivity.class, ACTIVITY_OPTIONS);
 
-    // ── KEY NEXUS CONCEPT: Nexus service stub for Compliance team ──
-    // TODO: Create the Nexus service stub (see javadoc above for the pattern)
-    //   private final ComplianceNexusService complianceService = ...
+    // ── Nexus service stub for calling the Compliance team's service ──
+    // Think of this like creating a REST client, but durable and type-safe.
+    // Instead of: new HttpClient("http://compliance-service/api/...")
+    // Temporal gives us: Workflow.newNexusServiceStub(ComplianceNexusService.class, options)
+    //
+    // The stub looks like a local Java object, but calls are routed
+    // across team boundaries via Temporal's Nexus infrastructure.
+
+    // How long can a Nexus operation take before Temporal gives up?
+    private static final NexusOperationOptions NEXUS_OPERATION_OPTIONS = NexusOperationOptions.newBuilder()
+            .setScheduleToCloseTimeout(Duration.ofMinutes(5))
+            .build();
+
+    // Wire the operation options into the service-level config
+    private static final NexusServiceOptions NEXUS_SERVICE_OPTIONS = NexusServiceOptions.newBuilder()
+            .setOperationOptions(NEXUS_OPERATION_OPTIONS)
+            .build();
+
+    // Create the stub — now we can call complianceService.categorizeTransaction()
+    // and complianceService.screenTransaction() as if they were local methods
+    private final ComplianceNexusService complianceService =
+            Workflow.newNexusServiceStub(ComplianceNexusService.class, NEXUS_SERVICE_OPTIONS);
+
 
     @Override
     public PaymentResult processPayment(PaymentRequest request) {
@@ -98,22 +125,33 @@ public class PaymentProcessingWorkflowImpl implements PaymentProcessingWorkflow 
             // ════════════════════════════════════════════════════
             // TODO: Call paymentActivity.validatePayment(request)
             //   If invalid, return PaymentResult(false, txnId, "REJECTED", ...)
-
+            boolean isValid = paymentActivity.validatePayment(request);
+            if(!isValid){
+                return new PaymentResult(false, request.transactionId, "REJECTED",
+                        "", "", "", "");
+            }
             // ════════════════════════════════════════════════════
             // Step 2: Categorize transaction via Nexus (SYNC)
             // ════════════════════════════════════════════════════
             // TODO:
             //   1. Build a CategoryRequest from the PaymentRequest fields:
-            //      new CategoryRequest(txnId, amount, description, senderCountry, receiverCountry)
+
+                  CategoryRequest categoryRequest = new CategoryRequest(request.transactionId,
+                          request.getAmount(), request.getDescription(), request.getSenderCountry(),
+                          request.getReceiverCountry());
             //   2. Call: complianceService.categorizeTransaction(catReq)
             //      This is a SYNC Nexus call — it returns immediately.
+            TransactionCategory transactionCategory = complianceService.categorizeTransaction(categoryRequest);
             //   3. Log the result
+            Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
+                    .info(transactionCategory.toString());
 
             // ════════════════════════════════════════════════════
             // Step 3: Screen for fraud via Nexus (ASYNC)
             // ════════════════════════════════════════════════════
             // TODO:
             //   1. Build a RiskScreeningRequest from the PaymentRequest fields
+
             //   2. Start an ASYNC Nexus operation:
             //      NexusOperationHandle<RiskScreeningResult> handle =
             //          Workflow.startNexusOperation(complianceService::screenTransaction, screenReq);

@@ -1,5 +1,8 @@
 # Temporalizing Strategy
 
+## Question 1: "What is the orchestration logic?"
+
+
 ## Identify activities
 
 // API calls
