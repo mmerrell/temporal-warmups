@@ -332,7 +332,42 @@ This is the heart of the exercise. Take your time here.
 
 **File 4: `compliance/temporal/ComplianceNexusServiceImpl.java`**
 
-Think of this like a **REST controller** — it receives requests from the Payments team and decides HOW to handle them:
+Think of this like a **REST controller** — it receives requests from the Payments team and decides HOW to handle them.
+
+Here's the full sequence of what happens when the Payment workflow makes a Nexus call:
+
+```
+PAYMENTS TEAM                                    COMPLIANCE TEAM
+PaymentProcessingWorkflow                        ComplianceNexusServiceImpl
+┌─────────────────────────┐                      ┌─────────────────────────────┐
+│                         │                      │                             │
+│  STEP 2 (SYNC)          │                      │  categorizeTransaction()    │
+│                         │  ── Nexus call ────► │                             │
+│  complianceService      │                      │  Runs inline:               │
+│    .categorize(catReq)  │                      │    agent.categorize(input)  │
+│                         │  ◄── result ──────── │    returns immediately      │
+│  category = result      │  TransactionCategory │                             │
+│                         │                      │                             │
+│  STEP 3 (ASYNC)         │                      │  screenTransaction()        │
+│                         │  ── Nexus call ────► │                             │
+│  handle = Workflow       │                      │  Starts NEW workflow:       │
+│    .startNexusOperation │  ◄── handle ──────── │  FraudDetectionWorkflow     │
+│                         │                      │         │                   │
+│                         │                      │         ▼                   │
+│  // workflow waits...   │                      │  ┌───────────────────────┐  │
+│                         │                      │  │ AI/LLM fraud analysis │  │
+│                         │                      │  │ Could take minutes... │  │
+│                         │                      │  └───────────┬───────────┘  │
+│                         │                      │              │              │
+│  riskResult = handle    │  ◄── result ──────── │◄─────────────┘              │
+│    .getResult().get()   │  RiskScreeningResult │                             │
+│                         │                      │                             │
+└─────────────────────────┘                      └─────────────────────────────┘
+       Task Queue:                                        Task Queue:
+  "payments-processing"                             "compliance-processing"
+```
+
+**Key insight:** Both teams run their own workers on separate task queues. Nexus is the bridge between them — like an internal API, but durable.
 
 ```
 Payments team calls Nexus          Nexus handler decides what to do

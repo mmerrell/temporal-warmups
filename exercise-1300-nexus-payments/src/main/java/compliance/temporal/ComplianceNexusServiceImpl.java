@@ -73,27 +73,52 @@ import shared.nexus.ComplianceNexusService;
 @ServiceImpl(service = ComplianceNexusService.class)
 public class ComplianceNexusServiceImpl {
 
-    // TODO: Implement screenTransaction() — ASYNC handler
-    //   @OperationImpl
-    //   public OperationHandler<RiskScreeningRequest, RiskScreeningResult> screenTransaction() {
-    //       return WorkflowClientOperationHandlers.fromWorkflowMethod(
-    //           (context, details, client, input) ->
-    //               client.newWorkflowStub(
-    //                   FraudDetectionWorkflow.class,
-    //                   WorkflowOptions.newBuilder()
-    //                       .setWorkflowId("fraud-screen-" + input.getTransactionId())
-    //                       .build()
-    //               )::screenTransaction
-    //       );
-    //   }
+    // ASYNC handler — "Start a background job and give the caller a tracking ticket"
+    //
+    // When the Payments team calls screenTransaction() via Nexus,
+    // this handler starts a WHOLE NEW WORKFLOW to do the work.
+    // The caller gets a handle to check progress and wait for the result.
+    @OperationImpl
+    public OperationHandler<RiskScreeningRequest, RiskScreeningResult> screenTransaction() {
+        //       Input type ↑                    Output type ↑
+        //       (what Payments sends us)        (what we send back when done)
+
+        // fromWorkflowMethod = "handle this Nexus call by starting a workflow"
+        return WorkflowClientOperationHandlers.fromWorkflowMethod(
+
+            // This lambda receives 4 things:
+            //   context → Nexus operation context (metadata, headers)
+            //   details → Operation details (operation name, etc.)
+            //   client  → A WorkflowClient — same thing you'd use to start any workflow
+            //   input   → The RiskScreeningRequest that the Payments team sent us
+            (context, details, client, input) ->
+
+                // Step 1: Create a workflow stub (like building an HTTP request)
+                client.newWorkflowStub(
+                    FraudDetectionWorkflow.class,   // Which workflow to start
+                    WorkflowOptions.newBuilder()
+                        // Business ID so we can find it: "fraud-screen-TXN-001"
+                        .setWorkflowId("fraud-screen-" + input.getTransactionId())
+                        .build()
+
+                // Step 2: Tell Temporal WHICH METHOD on that workflow to call
+                // :: is a Java method reference — "call screenTransaction on this stub"
+                )::screenTransaction
+
+                // That's it! Temporal will:
+                //   1. Start FraudDetectionWorkflow on the Compliance worker
+                //   2. Give the Payments team a handle to track it
+                //   3. When the workflow completes, the handle resolves with the result
+        );
+    }
 
     // TODO: Implement categorizeTransaction() — SYNC handler
-    //   @OperationImpl
-    //   public OperationHandler<CategoryRequest, TransactionCategory> categorizeTransaction() {
-    //       return WorkflowClientOperationHandlers.sync(
-    //           (context, details, client, input) -> {
-    //               TransactionCategorizerAgent agent = new TransactionCategorizerAgent();
-    //               return agent.categorize(input);
-    //           });
-    //   }
+       @OperationImpl
+       public OperationHandler<CategoryRequest, TransactionCategory> categorizeTransaction() {
+           return WorkflowClientOperationHandlers.sync(
+               (context, details, client, input) -> {
+                   TransactionCategorizerAgent agent = new TransactionCategorizerAgent();
+                   return agent.categorize(input);
+               });
+       }
 }

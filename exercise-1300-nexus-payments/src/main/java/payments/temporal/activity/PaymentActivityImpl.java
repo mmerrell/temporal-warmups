@@ -28,12 +28,12 @@ public class PaymentActivityImpl implements PaymentActivity {
     @Override
     public boolean validatePayment(PaymentRequest request) {
         // TODO: Delegate to gateway.validatePayment(request)
-        throw new UnsupportedOperationException("Implement me!");
+        return gateway.validatePayment(request);
     }
 
     @Override
     public String executePayment(PaymentRequest request) {
         // TODO: Delegate to gateway.executePayment(request)
-        throw new UnsupportedOperationException("Implement me!");
+        return gateway.executePayment(request);
     }
 }
