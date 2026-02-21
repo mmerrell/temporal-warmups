@@ -63,25 +63,27 @@ public class PaymentsWorkerApp {
         Worker worker = factory.newWorker(TaskQueue.TASK_QUEUE);
 
         // TODO: Register workflow WITH Nexus endpoint mapping
-        //   worker.registerWorkflowImplementationTypes(
-        //       WorkflowImplementationOptions.newBuilder()
-        //           .setNexusServiceOptions(
-        //               Collections.singletonMap(
-        //                   "ComplianceNexusService",
-        //                   NexusServiceOptions.newBuilder()
-        //                       .setEndpoint("compliance-endpoint")
-        //                       .build()))
-        //           .build(),
-        //       PaymentProcessingWorkflowImpl.class);
+        String nexusServiceName = "ComplianceNexusService";
+        String nexusComplianceEndpoint = "compliance-endpoint";
+        worker.registerWorkflowImplementationTypes(
+               WorkflowImplementationOptions.newBuilder()
+                   .setNexusServiceOptions(
+                       Collections.singletonMap(
+                               nexusServiceName,
+                           NexusServiceOptions.newBuilder()
+                               .setEndpoint(nexusComplianceEndpoint)
+                               .build()))
+                   .build(),
+               PaymentProcessingWorkflowImpl.class);
 
         // A — Activities (inject business logic dependencies)
         // TODO: Register activities
-        //   PaymentGateway gateway = new PaymentGateway();
-        //   worker.registerActivitiesImplementations(new PaymentActivityImpl(gateway));
+           PaymentGateway gateway = new PaymentGateway();
+           worker.registerActivitiesImplementations(new PaymentActivityImpl(gateway));
 
         // L — Launch!
         // TODO: Start the factory
-        //   factory.start();
+           factory.start();
 
         System.out.println("==========================================================");
         System.out.println("  Payments Worker started");

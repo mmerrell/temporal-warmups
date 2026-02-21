@@ -47,14 +47,12 @@ import java.util.concurrent.ExecutionException;
  *
  * ═══════════════════════════════════════════════════════════════════
  *
- * Steps:
- *   1. Connect to Temporal
- *   2. For each of the 5 transactions:
- *      a. Build WorkflowOptions with workflowId + taskQueue
- *      b. Create a workflow stub
- *      c. Start with WorkflowClient.execute() → CompletableFuture
- *   3. Wait for results (some will block waiting for approval signals)
- *   4. Print results
+ * Steps (START pattern — "Starters START workflows"):
+ *   S — Service: Connect to Temporal (WorkflowServiceStubs + WorkflowClient)
+ *   T — Target: Build WorkflowOptions (task queue + business ID like "payment-TXN-001")
+ *   A — Acquire: Create workflow stub (client.newWorkflowStub)
+ *   R — Run: Fire off workflows (WorkflowClient.execute → CompletableFuture)
+ *   T — Track: Wait for results (future.get() — high-risk ones block until signaled!)
  */
 public class PaymentStarter {
 
@@ -79,18 +77,22 @@ public class PaymentStarter {
                     "Cash deposit", "ACC-SENDER-005", "ACC-RECV-005"),
         };
 
-        // TODO: 1. Connect to Temporal
+        // S — Service: Connect to Temporal
+        // TODO:
         //   WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
         //   WorkflowClient client = WorkflowClient.newInstance(service);
 
-        // TODO: 2. Start all 5 workflows in parallel
+        // T, A, R — Target + Acquire + Run (in a loop for parallel execution)
+        // TODO:
         //   List<CompletableFuture<PaymentResult>> futures = new ArrayList<>();
         //   List<String> workflowIds = new ArrayList<>();
         //
         //   for (PaymentRequest txn : transactions) {
+        //       // T — Target: business ID workflow ID
         //       String workflowId = "payment-" + txn.getTransactionId();
         //       workflowIds.add(workflowId);
         //
+        //       // A — Acquire: typed workflow stub
         //       PaymentProcessingWorkflow workflow = client.newWorkflowStub(
         //           PaymentProcessingWorkflow.class,
         //           WorkflowOptions.newBuilder()
@@ -98,11 +100,13 @@ public class PaymentStarter {
         //               .setWorkflowId(workflowId)
         //               .build());
         //
+        //       // R — Run: fire off workflow (returns CompletableFuture)
         //       System.out.println("  Starting: " + workflowId);
         //       futures.add(WorkflowClient.execute(workflow::processPayment, txn));
         //   }
 
-        // TODO: 3. Wait for results
+        // T — Track: Wait for results
+        // TODO:
         //   System.out.println("\nAll workflows started! Waiting for results...");
         //   System.out.println("High-risk transactions need approval signals.\n");
         //

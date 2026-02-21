@@ -782,18 +782,32 @@ The only new thing is step 3 — instead of the simple `worker.registerWorkflowI
 
 **File 7: `payments/temporal/PaymentStarter.java`**
 
+#### The START Pattern — Every Starter Follows These 5 Steps
+
+> **"Starters START workflows."**
+
+| Step | Letter | What you do | Code |
+|------|--------|-------------|------|
+| 1 | **S** — Service | Connect to Temporal server | `WorkflowServiceStubs` + `WorkflowClient` |
+| 2 | **T** — Target | Build WorkflowOptions (task queue + business ID) | `.setTaskQueue(...)` + `.setWorkflowId("payment-TXN-001")` |
+| 3 | **A** — Acquire | Acquire a workflow stub | `client.newWorkflowStub(MyWorkflow.class, options)` |
+| 4 | **R** — Run | Run the workflow (fire it off) | `WorkflowClient.execute(wf::processPayment, txn)` |
+| 5 | **T** — Track | Track results (wait for completion) | `future.get()` |
+
 This starts all 5 payment workflows in parallel. The core loop:
 
 ```java
+// S — Service: Connect to Temporal
 WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
 WorkflowClient client = WorkflowClient.newInstance(service);
 
 List<CompletableFuture<PaymentResult>> futures = new ArrayList<>();
 
 for (PaymentRequest txn : transactions) {
-    // Business ID workflow ID: "payment-TXN-001" (not a random UUID!)
-    String workflowId = "payment-" + txn.getTransactionId();
+    // T — Target: WorkflowOptions with business ID + task queue
+    String workflowId = "payment-" + txn.getTransactionId();  // "payment-TXN-001" (not UUID!)
 
+    // A — Acquire: Create a typed workflow stub
     PaymentProcessingWorkflow workflow = client.newWorkflowStub(
             PaymentProcessingWorkflow.class,
             WorkflowOptions.newBuilder()
@@ -801,13 +815,14 @@ for (PaymentRequest txn : transactions) {
                     .setWorkflowId(workflowId)      // "payment-TXN-001"
                     .build());
 
-    // execute() returns a CompletableFuture — starts the workflow without blocking
+    // R — Run: execute() returns a CompletableFuture — starts without blocking
     futures.add(WorkflowClient.execute(workflow::processPayment, txn));
 }
 ```
 
 Then wait for results:
 ```java
+// T — Track: Wait for each workflow to complete
 for (int i = 0; i < futures.size(); i++) {
     PaymentResult result = futures.get(i).get();  // blocks until this workflow completes
     System.out.println(result.getTransactionId() + " → " + result.getStatus());
