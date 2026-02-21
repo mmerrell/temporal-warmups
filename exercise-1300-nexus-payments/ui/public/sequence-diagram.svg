@@ -251,10 +251,10 @@
     <text x="30" y="1170" class="time-label">~100ms</text>
 
     <!-- Final return -->
-    <line class="arrow arrow-return" x1="361" y1="1240" x2="127" y2="1240" marker-end="url(#arrowhead-return)"/>
-    <text x="245" y="1224" class="label-return" text-anchor="middle">PaymentResult(true, TXN-002, COMPLETED,</text>
-    <text x="245" y="1240" class="label-return" text-anchor="middle">HIGH, INTL_TRANSFER, CONF-TXN-002-...)</text>
-    <text x="245" y="1264" class="label-data" text-anchor="middle">CompletableFuture completes → future.get() returns</text>
+    <text x="245" y="1225" class="label-return" text-anchor="middle">PaymentResult(true, TXN-002, COMPLETED,</text>
+    <text x="245" y="1243" class="label-return" text-anchor="middle">HIGH, INTL_TRANSFER, CONF-TXN-002-...)</text>
+    <line class="arrow arrow-return" x1="361" y1="1268" x2="127" y2="1268" marker-end="url(#arrowhead-return)"/>
+    <text x="245" y="1292" class="label-data" text-anchor="middle">CompletableFuture completes → future.get() returns</text>
   </g>
 
   <!-- ═══════ LEGEND ═══════ -->
