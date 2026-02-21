@@ -1,0 +1,283 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1400" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <style>
+    .lifeline { stroke: #D5D8DC; stroke-width: 2; stroke-dasharray: 8 5; }
+    .header-payments { fill: #2980B9; rx: 8; }
+    .header-compliance { fill: #27AE60; rx: 8; }
+    .header-nexus { fill: #E67E22; rx: 8; }
+    .header-signal { fill: #8E44AD; rx: 8; }
+    .header-text { fill: white; font-size: 15px; font-weight: 700; text-anchor: middle; }
+    .header-sub { fill: white; font-size: 11px; text-anchor: middle; opacity: 0.9; }
+    .arrow { stroke-width: 2.5; fill: none; marker-end: url(#arrowhead); }
+    .arrow-payments { stroke: #2980B9; }
+    .arrow-compliance { stroke: #27AE60; }
+    .arrow-nexus { stroke: #E67E22; stroke-width: 3; stroke-dasharray: 10 5; }
+    .arrow-signal { stroke: #8E44AD; stroke-width: 3; stroke-dasharray: 7 4; }
+    .arrow-return { stroke: #95A5A6; stroke-width: 2; stroke-dasharray: 6 4; }
+    .label-mono { font-size: 14px; fill: #2C3E50; font-weight: 600; font-family: 'SF Mono', 'Consolas', monospace; }
+    .label-data { font-size: 12px; fill: #5D6D7E; font-family: 'SF Mono', 'Consolas', monospace; }
+    .label-return { font-size: 12px; fill: #7F8C8D; font-family: 'SF Mono', 'Consolas', monospace; }
+    .activation { rx: 3; }
+    .act-payments { fill: #D4E6F1; stroke: #2980B9; stroke-width: 2; }
+    .act-compliance { fill: #D5F5E3; stroke: #27AE60; stroke-width: 2; }
+    .act-nexus { fill: #FDEBD0; stroke: #E67E22; stroke-width: 2; }
+    .time-label { font-size: 13px; fill: #ABB2B9; font-weight: 600; }
+    .sleep-box { fill: #F5EEF8; stroke: #8E44AD; stroke-width: 2.5; stroke-dasharray: 8 4; rx: 10; }
+    .sleep-text { font-size: 16px; fill: #8E44AD; font-weight: 700; text-anchor: middle; }
+    .sleep-sub { font-size: 12px; fill: #8E44AD; text-anchor: middle; }
+    .step-badge { fill: #2C3E50; rx: 8; }
+    .step-num { fill: white; font-size: 16px; font-weight: 700; text-anchor: middle; }
+    .note { fill: #FCF3CF; stroke: #F4D03F; stroke-width: 1.5; rx: 6; }
+    .note-text { font-size: 12px; fill: #7D6608; }
+    .title { font-size: 26px; font-weight: 700; fill: #2C3E50; }
+    .subtitle { font-size: 15px; fill: #7F8C8D; }
+    .team-bar-text { font-size: 13px; font-weight: 700; }
+
+    @keyframes fadeStep1 { 0%,3% { opacity: 0.25; } 5%,14% { opacity: 1; } 16%,100% { opacity: 0.25; } }
+    @keyframes fadeStep2 { 0%,14% { opacity: 0.25; } 16%,28% { opacity: 1; } 30%,100% { opacity: 0.25; } }
+    @keyframes fadeStep3 { 0%,28% { opacity: 0.25; } 30%,44% { opacity: 1; } 46%,100% { opacity: 0.25; } }
+    @keyframes fadeStep4 { 0%,44% { opacity: 0.25; } 46%,58% { opacity: 1; } 60%,100% { opacity: 0.25; } }
+    @keyframes fadeStep5 { 0%,58% { opacity: 0.25; } 60%,72% { opacity: 1; } 74%,100% { opacity: 0.25; } }
+    @keyframes fadeStep6 { 0%,72% { opacity: 0.25; } 74%,86% { opacity: 1; } 88%,100% { opacity: 0.25; } }
+    @keyframes fadeStep7 { 0%,86% { opacity: 0.25; } 88%,98% { opacity: 1; } 100% { opacity: 0.25; } }
+
+    .step1 { animation: fadeStep1 28s infinite; }
+    .step2 { animation: fadeStep2 28s infinite; }
+    .step3 { animation: fadeStep3 28s infinite; }
+    .step4 { animation: fadeStep4 28s infinite; }
+    .step5 { animation: fadeStep5 28s infinite; }
+    .step6 { animation: fadeStep6 28s infinite; }
+    .step7 { animation: fadeStep7 28s infinite; }
+  </style>
+
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8" fill="context-stroke"/>
+    </marker>
+    <marker id="arrowhead-return" markerWidth="10" markerHeight="8" refX="0" refY="4" orient="auto">
+      <path d="M10,0 L0,4 L10,8" fill="#95A5A6"/>
+    </marker>
+  </defs>
+
+  <!-- White background -->
+  <rect x="0" y="0" width="1400" height="1400" fill="white" rx="12"/>
+
+  <!-- Soft team background bands -->
+  <rect x="0" y="0" width="730" height="1400" fill="#F7FBFE" rx="12"/>
+  <rect x="730" y="0" width="670" height="1400" fill="#F5FDF8" rx="12"/>
+
+  <!-- Title -->
+  <text x="700" y="40" text-anchor="middle" class="title">Sequence Diagram — TXN-002 (High-Risk Path)</text>
+  <text x="700" y="64" text-anchor="middle" class="subtitle">$49,999 US to Cayman Islands — every call in temporal order</text>
+
+  <!-- Team labels at top -->
+  <rect x="30" y="80" width="690" height="26" fill="#EBF5FB" rx="5"/>
+  <text x="375" y="98" text-anchor="middle" class="team-bar-text" fill="#2980B9">PAYMENTS TEAM — task queue: payments-processing</text>
+  <rect x="740" y="80" width="630" height="26" fill="#EAFAF1" rx="5"/>
+  <text x="1055" y="98" text-anchor="middle" class="team-bar-text" fill="#27AE60">COMPLIANCE TEAM — task queue: compliance-risk</text>
+
+  <!-- ═══════ LIFELINE HEADERS ═══════ -->
+  <!-- x positions: 120, 370, 600, 820, 1060, 1290 -->
+
+  <!-- PaymentStarter -->
+  <rect class="header-payments" x="40" y="115" width="160" height="50"/>
+  <text x="120" y="140" class="header-text">PaymentStarter</text>
+  <text x="120" y="156" class="header-sub">main()</text>
+  <line class="lifeline" x1="120" y1="165" x2="120" y2="1330"/>
+
+  <!-- PaymentProcessingWorkflow -->
+  <rect class="header-payments" x="260" y="115" width="220" height="50"/>
+  <text x="370" y="140" class="header-text">PaymentProcessingWF</text>
+  <text x="370" y="156" class="header-sub">processPayment()</text>
+  <line class="lifeline" x1="370" y1="165" x2="370" y2="1330"/>
+
+  <!-- PaymentActivity -->
+  <rect class="header-payments" x="510" y="115" width="180" height="50"/>
+  <text x="600" y="140" class="header-text">PaymentActivity</text>
+  <text x="600" y="156" class="header-sub">validate / execute</text>
+  <line class="lifeline" x1="600" y1="165" x2="600" y2="1330"/>
+
+  <!-- Nexus Boundary -->
+  <rect class="header-nexus" x="740" y="115" width="160" height="50"/>
+  <text x="820" y="140" class="header-text">Nexus Boundary</text>
+  <text x="820" y="156" class="header-sub">ComplianceNexusService</text>
+  <line class="lifeline" x1="820" y1="165" x2="820" y2="1330"/>
+
+  <!-- FraudDetectionWorkflow -->
+  <rect class="header-compliance" x="960" y="115" width="200" height="50"/>
+  <text x="1060" y="140" class="header-text">FraudDetectionWF</text>
+  <text x="1060" y="156" class="header-sub">screenTransaction()</text>
+  <line class="lifeline" x1="1060" y1="165" x2="1060" y2="1330"/>
+
+  <!-- Human Reviewer -->
+  <rect class="header-signal" x="1200" y="115" width="170" height="50"/>
+  <text x="1285" y="140" class="header-text">Human Reviewer</text>
+  <text x="1285" y="156" class="header-sub">CLI / Approvals UI</text>
+  <line class="lifeline" x1="1285" y1="165" x2="1285" y2="1330"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- STEP 0: Starter → Workflow                  -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g class="step1">
+    <rect class="activation act-payments" x="113" y="195" width="14" height="55"/>
+    <rect class="activation act-payments" x="363" y="235" width="14" height="1050"/>
+
+    <line class="arrow arrow-payments" x1="127" y1="220" x2="361" y2="220"/>
+    <text x="245" y="210" class="label-mono" text-anchor="middle">WorkflowClient.execute()</text>
+    <text x="245" y="238" class="label-data" text-anchor="middle">PaymentRequest(TXN-002, $49,999, US → Cayman Islands)</text>
+
+    <rect class="step-badge" x="25" y="205" width="28" height="28"/>
+    <text class="step-num" x="39" y="225">0</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- STEP 1: validatePayment()                   -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g class="step2">
+    <rect class="activation act-payments" x="593" y="275" width="14" height="75"/>
+
+    <line class="arrow arrow-payments" x1="377" y1="298" x2="591" y2="298"/>
+    <text x="484" y="288" class="label-mono" text-anchor="middle">validatePayment(request)</text>
+
+    <line class="arrow arrow-return" x1="591" y1="338" x2="377" y2="338" marker-end="url(#arrowhead-return)"/>
+    <text x="484" y="330" class="label-return" text-anchor="middle">returns true</text>
+
+    <rect class="step-badge" x="25" y="286" width="28" height="28"/>
+    <text class="step-num" x="39" y="306">1</text>
+    <text x="30" y="330" class="time-label">~100ms</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- STEP 2: Nexus SYNC — categorize             -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g class="step3">
+    <rect class="activation act-nexus" x="813" y="385" width="14" height="100"/>
+
+    <line class="arrow arrow-nexus" x1="377" y1="410" x2="811" y2="410"/>
+    <text x="594" y="396" class="label-mono" text-anchor="middle">NEXUS SYNC: categorizeTransaction(catReq)</text>
+    <text x="594" y="378" class="label-data" text-anchor="middle">CategoryRequest(TXN-002, $49,999, "Offshore investment...", US, Cayman Islands)</text>
+
+    <rect class="note" x="840" y="400" width="260" height="48" rx="6"/>
+    <text x="850" y="418" class="note-text">Runs inline — no workflow started</text>
+    <text x="850" y="436" class="note-text">TransactionCategorizerAgent.categorize()</text>
+
+    <line class="arrow arrow-return" x1="811" y1="472" x2="377" y2="472" marker-end="url(#arrowhead-return)"/>
+    <text x="594" y="463" class="label-return" text-anchor="middle">TransactionCategory("INTL_TRANSFER", "OFFSHORE")</text>
+
+    <rect class="step-badge" x="25" y="398" width="28" height="28"/>
+    <text class="step-num" x="39" y="418">2</text>
+    <text x="30" y="445" class="time-label">~2-5s</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- STEP 3: Nexus ASYNC — fraud screening       -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g class="step4">
+    <rect class="activation act-nexus" x="813" y="515" width="14" height="65"/>
+    <rect class="activation act-compliance" x="1053" y="565" width="14" height="195"/>
+
+    <line class="arrow arrow-nexus" x1="377" y1="540" x2="811" y2="540"/>
+    <text x="594" y="526" class="label-mono" text-anchor="middle">NEXUS ASYNC: screenTransaction(screenReq)</text>
+    <text x="594" y="508" class="label-data" text-anchor="middle">RiskScreeningRequest(TXN-002, $49,999, US, Cayman Islands)</text>
+
+    <line class="arrow arrow-compliance" x1="827" y1="575" x2="1051" y2="575"/>
+    <text x="939" y="564" class="label-mono" text-anchor="middle">starts workflow</text>
+    <text x="939" y="598" class="label-data" text-anchor="middle">ID: "fraud-screen-TXN-002"</text>
+
+    <rect class="note" x="1080" y="620" width="260" height="58" rx="6"/>
+    <text x="1090" y="639" class="note-text">FraudDetectionActivity</text>
+    <text x="1090" y="655" class="note-text">  → FraudDetectionAgent</text>
+    <text x="1090" y="671" class="note-text">  → AI/LLM analysis...</text>
+
+    <line class="arrow arrow-return" x1="1051" y1="745" x2="827" y2="745" marker-end="url(#arrowhead-return)"/>
+    <text x="939" y="736" class="label-return" text-anchor="middle">RiskScreeningResult(HIGH, 0.87)</text>
+
+    <line class="arrow arrow-return" x1="811" y1="772" x2="377" y2="772" marker-end="url(#arrowhead-return)"/>
+    <text x="594" y="763" class="label-return" text-anchor="middle">handle.getResult().get() → RiskScreeningResult</text>
+
+    <rect class="step-badge" x="25" y="528" width="28" height="28"/>
+    <text class="step-num" x="39" y="548">3</text>
+    <text x="30" y="640" class="time-label">~10-30s</text>
+    <text x="30" y="658" class="time-label">(AI call)</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- STEP 4: Workflow.await() — SLEEPING         -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g class="step5">
+    <rect class="sleep-box" x="300" y="810" width="140" height="130"/>
+    <text x="370" y="855" class="sleep-text">SLEEPING</text>
+    <text x="370" y="878" class="sleep-sub">Workflow.await(24h,</text>
+    <text x="370" y="895" class="sleep-sub">() → approvalReceived)</text>
+    <text x="370" y="928" class="sleep-sub" font-size="11">isRequiresApproval() == true</text>
+
+    <rect class="step-badge" x="25" y="843" width="28" height="28"/>
+    <text class="step-num" x="39" y="863">4</text>
+    <text x="30" y="895" class="time-label">minutes</text>
+    <text x="30" y="913" class="time-label">to hours</text>
+    <text x="30" y="931" class="time-label">(durable!)</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- STEP 5: Signal arrives                      -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g class="step6">
+    <line class="arrow arrow-signal" x1="1280" y1="990" x2="377" y2="990"/>
+    <text x="828" y="976" class="label-mono" text-anchor="middle">Signal: approveTransaction(decision)</text>
+    <text x="828" y="1010" class="label-data" text-anchor="middle">ApprovalDecision(approved=true, "Jane", "Verified client identity")</text>
+
+    <rect class="note" x="385" y="1025" width="290" height="60" rx="6"/>
+    <text x="395" y="1045" class="note-text">this.approved = true</text>
+    <text x="395" y="1063" class="note-text">this.approvalReceived = true</text>
+    <text x="395" y="1081" class="note-text" font-weight="600">→ Workflow.await() unblocks!</text>
+
+    <rect class="step-badge" x="25" y="978" width="28" height="28"/>
+    <text class="step-num" x="39" y="998">5</text>
+  </g>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- STEP 6: executePayment() + result           -->
+  <!-- ═══════════════════════════════════════════ -->
+  <g class="step7">
+    <rect class="activation act-payments" x="593" y="1110" width="14" height="75"/>
+
+    <line class="arrow arrow-payments" x1="377" y1="1135" x2="591" y2="1135"/>
+    <text x="484" y="1122" class="label-mono" text-anchor="middle">executePayment(request)</text>
+
+    <line class="arrow arrow-return" x1="591" y1="1172" x2="377" y2="1172" marker-end="url(#arrowhead-return)"/>
+    <text x="484" y="1164" class="label-return" text-anchor="middle">"CONF-TXN-002-a1b2c3"</text>
+
+    <rect class="step-badge" x="25" y="1123" width="28" height="28"/>
+    <text class="step-num" x="39" y="1143">6</text>
+    <text x="30" y="1170" class="time-label">~100ms</text>
+
+    <!-- Final return -->
+    <line class="arrow arrow-return" x1="361" y1="1240" x2="127" y2="1240" marker-end="url(#arrowhead-return)"/>
+    <text x="245" y="1224" class="label-return" text-anchor="middle">PaymentResult(true, TXN-002, COMPLETED,</text>
+    <text x="245" y="1240" class="label-return" text-anchor="middle">HIGH, INTL_TRANSFER, CONF-TXN-002-...)</text>
+    <text x="245" y="1264" class="label-data" text-anchor="middle">CompletableFuture completes → future.get() returns</text>
+  </g>
+
+  <!-- ═══════ LEGEND ═══════ -->
+  <g transform="translate(40, 1330)">
+    <rect x="-10" y="-12" width="1340" height="50" fill="#F8F9FA" rx="8" stroke="#E5E7E9" stroke-width="1"/>
+
+    <line x1="10" y1="8" x2="50" y2="8" stroke="#2980B9" stroke-width="2.5"/>
+    <text x="58" y="13" font-size="12" fill="#2C3E50">Payments call</text>
+
+    <line x1="190" y1="8" x2="230" y2="8" stroke="#E67E22" stroke-width="3" stroke-dasharray="10 5"/>
+    <text x="238" y="13" font-size="12" fill="#2C3E50">Nexus call</text>
+
+    <line x1="340" y1="8" x2="380" y2="8" stroke="#8E44AD" stroke-width="3" stroke-dasharray="7 4"/>
+    <text x="388" y="13" font-size="12" fill="#2C3E50">Signal</text>
+
+    <line x1="460" y1="8" x2="500" y2="8" stroke="#95A5A6" stroke-width="2" stroke-dasharray="6 4"/>
+    <text x="508" y="13" font-size="12" fill="#2C3E50">Return value</text>
+
+    <rect x="640" y="0" width="20" height="16" fill="#F5EEF8" stroke="#8E44AD" stroke-width="2" stroke-dasharray="5 3" rx="4"/>
+    <text x="668" y="13" font-size="12" fill="#2C3E50">Durable sleep (survives crashes)</text>
+
+    <text x="960" y="13" font-size="12" fill="#ABB2B9" font-style="italic">Steps highlight in sequence (~28s loop)</text>
+
+    <text x="660" y="32" font-size="11" fill="#ABB2B9" text-anchor="middle">TXN-002: $49,999 US → Cayman Islands (high-risk path — touches every step including approval)</text>
+  </g>
+</svg>

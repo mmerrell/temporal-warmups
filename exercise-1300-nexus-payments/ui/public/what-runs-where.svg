@@ -1,0 +1,257 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1300 820" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <style>
+    .title { font-size: 22px; font-weight: 700; fill: #2C3E50; }
+    .subtitle { font-size: 13px; fill: #7F8C8D; }
+    .terminal-box { rx: 10; stroke-width: 2; }
+    .terminal-label { font-size: 13px; font-weight: 700; }
+    .class-box { rx: 6; stroke-width: 1.5; }
+    .class-name { font-size: 12px; font-weight: 600; }
+    .class-type { font-size: 10px; }
+    .class-detail { font-size: 9.5px; font-family: 'SF Mono', 'Consolas', monospace; }
+    .queue-label { font-size: 11px; font-weight: 600; font-family: 'SF Mono', 'Consolas', monospace; }
+    .conn-nexus { stroke: #E67E22; stroke-width: 2.5; stroke-dasharray: 10 5; }
+    .legend-text { font-size: 11px; fill: #2C3E50; }
+    .badge { rx: 3; }
+    .badge-text { font-size: 9px; font-weight: 600; fill: white; text-anchor: middle; }
+    .section-label { font-size: 12px; font-weight: 700; fill: #7F8C8D; text-anchor: middle; letter-spacing: 2px; }
+
+    @keyframes nexusPulse {
+      0%, 100% { stroke-opacity: 0.4; }
+      50% { stroke-opacity: 1; }
+    }
+    .nexus-pulse { animation: nexusPulse 3s infinite ease-in-out; }
+  </style>
+
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="context-stroke"/>
+    </marker>
+    <marker id="arr-orange" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <path d="M0,0 L10,3.5 L0,7" fill="#E67E22"/>
+    </marker>
+    <linearGradient id="bg-payments" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#EBF5FB"/>
+      <stop offset="100%" stop-color="#D4E6F1"/>
+    </linearGradient>
+    <linearGradient id="bg-compliance" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#EAFAF1"/>
+      <stop offset="100%" stop-color="#D5F5E3"/>
+    </linearGradient>
+  </defs>
+
+  <!-- White background -->
+  <rect x="0" y="0" width="1300" height="820" fill="white" rx="12"/>
+
+  <!-- Title -->
+  <text x="650" y="34" text-anchor="middle" class="title">What Runs Where — 7 Terminals, 15+ Classes</text>
+  <text x="650" y="54" text-anchor="middle" class="subtitle">"Which worker runs this class?" — answered once and for all</text>
+
+  <!-- ═══════ LEFT SIDE: PAYMENTS TEAM ═══════ -->
+
+  <text x="280" y="82" text-anchor="middle" class="section-label">PAYMENTS TEAM</text>
+
+  <!-- Terminal 6: PaymentStarter -->
+  <rect x="30" y="97" width="220" height="175" fill="#FDFEFE" stroke="#2980B9" class="terminal-box"/>
+  <rect x="30" y="97" width="220" height="28" fill="#2980B9" rx="10"/>
+  <rect x="30" y="115" width="220" height="10" fill="#2980B9"/>
+  <text x="140" y="116" text-anchor="middle" class="terminal-label" fill="white">Terminal 6 — Starter</text>
+
+  <text x="140" y="148" text-anchor="middle" class="queue-label" fill="#2980B9">mvn exec:java@starter</text>
+
+  <rect x="50" y="160" width="180" height="52" fill="#D4E6F1" stroke="#2980B9" class="class-box"/>
+  <text x="140" y="179" text-anchor="middle" class="class-name" fill="#2980B9">PaymentStarter</text>
+  <text x="140" y="194" text-anchor="middle" class="class-detail" fill="#566573">START: S → T → A → R → T</text>
+  <text x="140" y="206" text-anchor="middle" class="class-detail" fill="#566573">starts 5 workflows in parallel</text>
+
+  <rect x="60" y="222" width="72" height="18" fill="#E74C3C" class="badge"/>
+  <text x="96" y="234" class="badge-text">NOT A WORKER</text>
+  <text x="142" y="234" font-size="9" fill="#95A5A6">runs once, exits</text>
+
+  <!-- Terminal 5: Payments Worker -->
+  <rect x="30" y="300" width="510" height="290" fill="url(#bg-payments)" stroke="#2980B9" class="terminal-box"/>
+  <rect x="30" y="300" width="510" height="28" fill="#2980B9" rx="10"/>
+  <rect x="30" y="318" width="510" height="10" fill="#2980B9"/>
+  <text x="285" y="319" text-anchor="middle" class="terminal-label" fill="white">Terminal 5 — Payments Worker</text>
+
+  <text x="285" y="350" text-anchor="middle" class="queue-label" fill="#2980B9">task queue: "payments-processing"</text>
+  <text x="285" y="366" text-anchor="middle" class="class-detail" fill="#7F8C8D">mvn exec:java@payments-worker  |  CRAWL pattern  |  keeps running</text>
+
+  <!-- PaymentProcessingWorkflowImpl -->
+  <rect x="50" y="380" width="225" height="75" fill="white" stroke="#2980B9" class="class-box"/>
+  <text x="162" y="400" text-anchor="middle" class="class-name" fill="#2980B9">PaymentProcessingWorkflowImpl</text>
+  <text x="162" y="415" text-anchor="middle" class="class-type" fill="#566573">Workflow</text>
+  <text x="162" y="430" text-anchor="middle" class="class-detail" fill="#7F8C8D">processPayment()</text>
+  <text x="162" y="444" text-anchor="middle" class="class-detail" fill="#8E44AD">@SignalMethod approveTransaction()</text>
+
+  <!-- PaymentActivityImpl -->
+  <rect x="295" y="380" width="225" height="75" fill="white" stroke="#2980B9" class="class-box"/>
+  <text x="407" y="400" text-anchor="middle" class="class-name" fill="#2980B9">PaymentActivityImpl</text>
+  <text x="407" y="415" text-anchor="middle" class="class-type" fill="#566573">Activity</text>
+  <text x="407" y="430" text-anchor="middle" class="class-detail" fill="#7F8C8D">validatePayment()</text>
+  <text x="407" y="444" text-anchor="middle" class="class-detail" fill="#7F8C8D">executePayment()</text>
+
+  <!-- PaymentGateway (injected) -->
+  <rect x="315" y="468" width="185" height="35" fill="#FDFEFE" stroke="#BDC3C7" class="class-box" stroke-dasharray="4 3"/>
+  <text x="407" y="484" text-anchor="middle" class="class-name" fill="#95A5A6">PaymentGateway</text>
+  <text x="407" y="497" text-anchor="middle" class="class-detail" fill="#BDC3C7">injected into activity</text>
+  <line x1="407" y1="455" x2="407" y2="466" stroke="#BDC3C7" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#arr)"/>
+
+  <!-- Nexus stub -->
+  <rect x="50" y="468" width="245" height="50" fill="#FDEBD0" stroke="#E67E22" class="class-box" stroke-dasharray="5 3"/>
+  <text x="172" y="484" text-anchor="middle" class="class-name" fill="#E67E22">Nexus Stub (caller side)</text>
+  <text x="172" y="498" text-anchor="middle" class="class-detail" fill="#E67E22">Workflow.newNexusServiceStub(</text>
+  <text x="172" y="510" text-anchor="middle" class="class-detail" fill="#E67E22">  ComplianceNexusService.class)</text>
+
+  <!-- CRAWL badges -->
+  <rect x="50" y="530" width="100" height="17" fill="#2980B9" class="badge"/>
+  <text x="100" y="542" class="badge-text">R — REGISTER</text>
+  <text x="160" y="542" font-size="9" fill="#566573">registerWorkflowImplementationTypes()</text>
+
+  <rect x="50" y="551" width="100" height="17" fill="#2980B9" class="badge"/>
+  <text x="100" y="563" class="badge-text">A — ACTIVITIES</text>
+  <text x="160" y="563" font-size="9" fill="#566573">registerActivitiesImplementations()</text>
+
+  <rect x="50" y="572" width="100" height="17" fill="#E67E22" class="badge"/>
+  <text x="100" y="584" class="badge-text">W — WIRE</text>
+  <text x="160" y="584" font-size="9" fill="#566573">setNexusServiceOptions("compliance-endpoint")</text>
+
+  <!-- ═══════ NEXUS BOUNDARY ═══════ -->
+  <line x1="600" y1="75" x2="600" y2="780" stroke="#E67E22" stroke-width="3" stroke-dasharray="14 7" opacity="0.5" class="nexus-pulse"/>
+  <rect x="573" y="58" width="54" height="22" fill="#FDEBD0" stroke="#E67E22" stroke-width="1" rx="5"/>
+  <text x="600" y="73" text-anchor="middle" font-size="10" font-weight="700" fill="#E67E22">NEXUS</text>
+
+  <!-- Nexus arrows -->
+  <line x1="540" y1="420" x2="660" y2="385" class="conn-nexus nexus-pulse" marker-end="url(#arr-orange)"/>
+  <text x="610" y="393" text-anchor="middle" font-size="10" fill="#E67E22" font-weight="600" transform="rotate(-7, 610, 393)">SYNC: categorize</text>
+
+  <line x1="540" y1="445" x2="660" y2="478" class="conn-nexus nexus-pulse" marker-end="url(#arr-orange)"/>
+  <text x="610" y="472" text-anchor="middle" font-size="10" fill="#E67E22" font-weight="600" transform="rotate(7, 610, 472)">ASYNC: screen</text>
+
+  <!-- ═══════ RIGHT SIDE: COMPLIANCE TEAM ═══════ -->
+
+  <text x="960" y="82" text-anchor="middle" class="section-label">COMPLIANCE TEAM</text>
+
+  <!-- Terminal 4: Compliance Worker -->
+  <rect x="670" y="300" width="600" height="290" fill="url(#bg-compliance)" stroke="#27AE60" class="terminal-box"/>
+  <rect x="670" y="300" width="600" height="28" fill="#27AE60" rx="10"/>
+  <rect x="670" y="318" width="600" height="10" fill="#27AE60"/>
+  <text x="970" y="319" text-anchor="middle" class="terminal-label" fill="white">Terminal 4 — Compliance Worker</text>
+
+  <text x="970" y="350" text-anchor="middle" class="queue-label" fill="#27AE60">task queue: "compliance-risk"</text>
+  <text x="970" y="366" text-anchor="middle" class="class-detail" fill="#7F8C8D">mvn exec:java@compliance-worker  |  CRAWL pattern  |  keeps running</text>
+
+  <!-- ComplianceNexusServiceImpl -->
+  <rect x="690" y="380" width="240" height="75" fill="#FDEBD0" stroke="#E67E22" class="class-box"/>
+  <text x="810" y="400" text-anchor="middle" class="class-name" fill="#E67E22">ComplianceNexusServiceImpl</text>
+  <text x="810" y="415" text-anchor="middle" class="class-type" fill="#E67E22">Nexus Handler</text>
+  <text x="810" y="430" text-anchor="middle" class="class-detail" fill="#7F8C8D">screenTransaction() → ASYNC</text>
+  <text x="810" y="444" text-anchor="middle" class="class-detail" fill="#7F8C8D">categorizeTransaction() → SYNC</text>
+
+  <!-- FraudDetectionWorkflowImpl -->
+  <rect x="950" y="380" width="300" height="58" fill="white" stroke="#27AE60" class="class-box"/>
+  <text x="1100" y="400" text-anchor="middle" class="class-name" fill="#27AE60">FraudDetectionWorkflowImpl</text>
+  <text x="1100" y="415" text-anchor="middle" class="class-type" fill="#566573">Workflow (started by Nexus async handler)</text>
+  <text x="1100" y="430" text-anchor="middle" class="class-detail" fill="#7F8C8D">screenTransaction()</text>
+
+  <!-- FraudDetectionActivityImpl -->
+  <rect x="950" y="450" width="300" height="50" fill="white" stroke="#27AE60" class="class-box"/>
+  <text x="1100" y="469" text-anchor="middle" class="class-name" fill="#27AE60">FraudDetectionActivityImpl</text>
+  <text x="1100" y="484" text-anchor="middle" class="class-type" fill="#566573">Activity</text>
+  <text x="1100" y="496" text-anchor="middle" class="class-detail" fill="#7F8C8D">screenTransaction()</text>
+
+  <line x1="1100" y1="438" x2="1100" y2="448" stroke="#27AE60" stroke-width="1" marker-end="url(#arr)"/>
+
+  <!-- Injected deps -->
+  <rect x="690" y="468" width="230" height="35" fill="#FDFEFE" stroke="#BDC3C7" class="class-box" stroke-dasharray="4 3"/>
+  <text x="805" y="484" text-anchor="middle" class="class-name" fill="#95A5A6">TransactionCategorizerAgent</text>
+  <text x="805" y="497" text-anchor="middle" class="class-detail" fill="#BDC3C7">created inside sync handler</text>
+
+  <rect x="950" y="512" width="300" height="35" fill="#FDFEFE" stroke="#BDC3C7" class="class-box" stroke-dasharray="4 3"/>
+  <text x="1100" y="528" text-anchor="middle" class="class-name" fill="#95A5A6">FraudDetectionAgent</text>
+  <text x="1100" y="541" text-anchor="middle" class="class-detail" fill="#BDC3C7">injected into activity</text>
+  <line x1="1100" y1="500" x2="1100" y2="510" stroke="#BDC3C7" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#arr)"/>
+
+  <!-- CRAWL badges -->
+  <rect x="690" y="530" width="100" height="17" fill="#27AE60" class="badge"/>
+  <text x="740" y="542" class="badge-text">R — REGISTER</text>
+  <text x="800" y="542" font-size="9" fill="#566573">registerWorkflowImplementationTypes()</text>
+
+  <rect x="690" y="551" width="100" height="17" fill="#27AE60" class="badge"/>
+  <text x="740" y="563" class="badge-text">A — ACTIVITIES</text>
+  <text x="800" y="563" font-size="9" fill="#566573">registerActivitiesImplementations()</text>
+
+  <rect x="690" y="572" width="100" height="17" fill="#E67E22" class="badge"/>
+  <text x="740" y="584" class="badge-text">W — WIRE</text>
+  <text x="800" y="584" font-size="9" fill="#566573">registerNexusServiceImplementation()</text>
+
+  <!-- ═══════ SHARED CONTRACT ═══════ -->
+  <rect x="420" y="630" width="420" height="70" fill="#FEF9E7" stroke="#F4D03F" stroke-width="2" rx="10"/>
+  <text x="630" y="654" text-anchor="middle" font-size="13" font-weight="700" fill="#7D6608">Shared Contract (both teams depend on this)</text>
+  <text x="630" y="672" text-anchor="middle" font-size="11" font-family="'SF Mono', 'Consolas', monospace" fill="#7D6608">shared/nexus/ComplianceNexusService.java</text>
+  <text x="630" y="690" text-anchor="middle" font-size="10" fill="#9A7D0A">Interface: screenTransaction() + categorizeTransaction()</text>
+
+  <line x1="510" y1="630" x2="350" y2="595" stroke="#F4D03F" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr)"/>
+  <line x1="750" y1="630" x2="900" y2="595" stroke="#F4D03F" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr)"/>
+
+  <!-- ═══════ OTHER TERMINALS (top right) ═══════ -->
+  <g transform="translate(670, 97)">
+    <!-- Terminal 1 -->
+    <rect x="0" y="0" width="185" height="58" fill="#FDFEFE" stroke="#566573" class="terminal-box" stroke-width="1.5"/>
+    <rect x="0" y="0" width="185" height="22" fill="#566573" rx="10"/>
+    <rect x="0" y="14" width="185" height="8" fill="#566573"/>
+    <text x="92" y="16" text-anchor="middle" font-size="10" font-weight="700" fill="white">Terminal 1 — UI</text>
+    <text x="92" y="39" text-anchor="middle" font-size="10" fill="#566573" font-family="monospace">npm run dev</text>
+    <text x="92" y="52" text-anchor="middle" font-size="9" fill="#95A5A6">localhost:3000</text>
+
+    <!-- Terminal 2 -->
+    <rect x="200" y="0" width="185" height="58" fill="#FDFEFE" stroke="#566573" class="terminal-box" stroke-width="1.5"/>
+    <rect x="200" y="0" width="185" height="22" fill="#566573" rx="10"/>
+    <rect x="200" y="14" width="185" height="8" fill="#566573"/>
+    <text x="292" y="16" text-anchor="middle" font-size="10" font-weight="700" fill="white">Terminal 2 — Temporal</text>
+    <text x="292" y="39" text-anchor="middle" font-size="10" fill="#566573" font-family="monospace">temporal server start-dev</text>
+    <text x="292" y="52" text-anchor="middle" font-size="9" fill="#95A5A6">localhost:8233</text>
+
+    <!-- Terminal 3 -->
+    <rect x="400" y="0" width="185" height="58" fill="#FDFEFE" stroke="#566573" class="terminal-box" stroke-width="1.5"/>
+    <rect x="400" y="0" width="185" height="22" fill="#566573" rx="10"/>
+    <rect x="400" y="14" width="185" height="8" fill="#566573"/>
+    <text x="492" y="16" text-anchor="middle" font-size="10" font-weight="700" fill="white">Terminal 3 — Nexus</text>
+    <text x="492" y="36" text-anchor="middle" font-size="9" fill="#566573" font-family="monospace">temporal operator nexus</text>
+    <text x="492" y="48" text-anchor="middle" font-size="9" fill="#566573" font-family="monospace">endpoint create ...</text>
+  </g>
+
+  <!-- Terminal 7 (signals) — wider to fit text -->
+  <g transform="translate(670, 178)">
+    <rect x="0" y="0" width="585" height="62" fill="#F5EEF8" stroke="#8E44AD" class="terminal-box" stroke-width="1.5"/>
+    <rect x="0" y="0" width="585" height="22" fill="#8E44AD" rx="10"/>
+    <rect x="0" y="14" width="585" height="8" fill="#8E44AD"/>
+    <text x="292" y="16" text-anchor="middle" font-size="10" font-weight="700" fill="white">Terminal 7 — Send Approval Signals</text>
+    <text x="292" y="37" text-anchor="middle" font-size="10" fill="#8E44AD" font-family="monospace">temporal workflow signal \</text>
+    <text x="292" y="50" text-anchor="middle" font-size="10" fill="#8E44AD" font-family="monospace">  --workflow-id payment-TXN-002 --name approveTransaction</text>
+    <text x="292" y="61" text-anchor="middle" font-size="9" fill="#95A5A6">Or use the Approvals UI at localhost:3000/approvals</text>
+  </g>
+
+  <!-- ═══════ LEGEND ═══════ -->
+  <g transform="translate(30, 730)">
+    <rect x="-10" y="-10" width="1260" height="70" fill="#F8F9FA" rx="8" stroke="#E5E7E9" stroke-width="1"/>
+
+    <!-- Row 1 -->
+    <rect x="10" y="2" width="14" height="14" fill="#D4E6F1" stroke="#2980B9" stroke-width="1.5" rx="3"/>
+    <text x="32" y="13" class="legend-text">Workflow / Activity</text>
+
+    <rect x="200" y="2" width="14" height="14" fill="#FDEBD0" stroke="#E67E22" stroke-width="1.5" rx="3"/>
+    <text x="222" y="13" class="legend-text">Nexus Handler</text>
+
+    <rect x="370" y="2" width="14" height="14" fill="#FDFEFE" stroke="#BDC3C7" stroke-width="1.5" rx="3" stroke-dasharray="4 2"/>
+    <text x="392" y="13" class="legend-text">Business logic (injected)</text>
+
+    <rect x="590" y="2" width="14" height="14" fill="#FEF9E7" stroke="#F4D03F" stroke-width="1.5" rx="3"/>
+    <text x="612" y="13" class="legend-text">Shared contract</text>
+
+    <line x1="770" y1="9" x2="810" y2="9" stroke="#E67E22" stroke-width="3" stroke-dasharray="8 4"/>
+    <text x="820" y="13" class="legend-text">Nexus call (crosses boundary)</text>
+
+    <!-- Row 2 -->
+    <text x="10" y="42" class="legend-text" fill="#7F8C8D">CRAWL badges show which worker registration step (R, A, or W) wires each class into the worker.</text>
+  </g>
+</svg>

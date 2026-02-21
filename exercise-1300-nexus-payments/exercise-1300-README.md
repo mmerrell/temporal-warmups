@@ -1,5 +1,7 @@
 # Exercise 1300 - Cross-Team Payment Compliance via Temporal Nexus (Java)
 
+![data-flow.svg](ui/public/data-flow.svg)
+
 ## Scenario
 
 You work at a digital bank where two engineering teams need to communicate reliably:
@@ -98,6 +100,14 @@ Think of Nexus as **durable RPC between Temporal applications**:
 | Audit trail | Build yourself | Built-in event history |
 
 ## Breaking Down the Problem
+
+### Visual Guides
+
+| Diagram | What it answers | Link |
+|---------|----------------|------|
+| Data Flow (animated) | "What data moves where?" | [data-flow.svg](http://localhost:3000/data-flow.svg) |
+| Sequence Diagram (animated) | "What happens in what order? What's blocked on what?" | [sequence-diagram.svg](http://localhost:3000/sequence-diagram.svg) |
+| What Runs Where | "Which worker runs this class? Which terminal do I need?" | [what-runs-where.svg](http://localhost:3000/what-runs-where.svg) |
 
 ### Architecture Overview
 
