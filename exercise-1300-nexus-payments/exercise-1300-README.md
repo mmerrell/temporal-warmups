@@ -732,13 +732,13 @@ PaymentRequest (input)
 
 > **"Workers CRAWL before they run."**
 
-| Step | Letter | What you do | Code |
-|------|--------|-------------|------|
-| 1 | **C** — Connect | Connect to Temporal server | `WorkflowServiceStubs` + `WorkflowClient` |
-| 2 | **R** — Register | Register workflow types on the worker | `worker.registerWorkflowImplementationTypes(...)` |
-| 3 | **A** — Activities | Register activity implementations (inject dependencies) | `worker.registerActivitiesImplementations(...)` |
-| 4 | **W** — Wire | Wire up special config (Nexus endpoints, interceptors) | `setNexusServiceOptions(...)` or skip if none |
-| 5 | **L** — Launch | Launch the worker — start polling the task queue | `factory.start()` |
+| Step | What you do | API to use |
+|------|-------------|------------|
+| **C** — Connect | Connect to Temporal server | `WorkflowServiceStubs.newLocalServiceStubs()` → `WorkflowClient.newInstance(service)` |
+| **R** — Register | Register workflow implementation types | `WorkerFactory.newInstance(client)` → `factory.newWorker("task-queue")` → `worker.registerWorkflowImplementationTypes(MyWorkflowImpl.class)` |
+| **A** — Activities | Register activity implementations (inject dependencies via constructor) | `worker.registerActivitiesImplementations(new MyActivityImpl(dependency))` |
+| **W** — Wire | Wire Nexus endpoints, interceptors, or other config. Skip if none | Caller side: `WorkflowImplementationOptions.newBuilder().setNexusServiceOptions(...)`. Handler side: `worker.registerNexusServiceImplementation(new MyNexusImpl())` |
+| **L** — Launch | Start polling the task queue | `factory.start()` |
 
 For simple workers (no Nexus), skip **W** and it's just C-R-A-L. In this exercise, both workers use all 5 steps.
 
@@ -786,13 +786,13 @@ The only new thing is step 3 — instead of the simple `worker.registerWorkflowI
 
 > **"Starters START workflows."**
 
-| Step | Letter | What you do | Code |
-|------|--------|-------------|------|
-| 1 | **S** — Service | Connect to Temporal server | `WorkflowServiceStubs` + `WorkflowClient` |
-| 2 | **T** — Target | Build WorkflowOptions (task queue + business ID) | `.setTaskQueue(...)` + `.setWorkflowId("payment-TXN-001")` |
-| 3 | **A** — Acquire | Acquire a workflow stub | `client.newWorkflowStub(MyWorkflow.class, options)` |
-| 4 | **R** — Run | Run the workflow (fire it off) | `WorkflowClient.execute(wf::processPayment, txn)` |
-| 5 | **T** — Track | Track results (wait for completion) | `future.get()` |
+| Step | What you do | API to use |
+|------|-------------|------------|
+| **S** — Service | Connect to Temporal server | `WorkflowServiceStubs.newLocalServiceStubs()` → `WorkflowClient.newInstance(service)` |
+| **T** — Target | Build WorkflowOptions with task queue + business ID | `WorkflowOptions.newBuilder().setTaskQueue("payments-processing").setWorkflowId("payment-" + txn.getTransactionId()).build()` |
+| **A** — Acquire | Acquire a typed workflow stub | `client.newWorkflowStub(PaymentProcessingWorkflow.class, options)` — returns a proxy you call like a local method |
+| **R** — Run | Run the workflow (fire it off) | `WorkflowClient.execute(wf::processPayment, txn)` → returns `CompletableFuture<PaymentResult>`. Use `start()` instead if you don't need the result |
+| **T** — Track | Track results (wait for completion) | `future.get()` — blocks until workflow completes. For high-risk payments, this blocks until approval signal arrives |
 
 This starts all 5 payment workflows in parallel. The core loop:
 

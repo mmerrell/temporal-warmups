@@ -3,6 +3,7 @@ package payments.temporal;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowOptions;
 import io.temporal.serviceclient.WorkflowServiceStubs;
+import payments.TaskQueue;
 import payments.domain.PaymentRequest;
 import payments.domain.PaymentResult;
 
@@ -56,8 +57,6 @@ import java.util.concurrent.ExecutionException;
  */
 public class PaymentStarter {
 
-    private static final String TASK_QUEUE = "payments-processing";
-
     public static void main(String[] args) {
         System.out.println("==========================================================");
         System.out.println("  PAYMENT STARTER - Starting 5 payments via Temporal");
@@ -79,48 +78,48 @@ public class PaymentStarter {
 
         // S — Service: Connect to Temporal
         // TODO:
-        //   WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
-        //   WorkflowClient client = WorkflowClient.newInstance(service);
+           WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
+           WorkflowClient client = WorkflowClient.newInstance(service);
 
         // T, A, R — Target + Acquire + Run (in a loop for parallel execution)
         // TODO:
-        //   List<CompletableFuture<PaymentResult>> futures = new ArrayList<>();
-        //   List<String> workflowIds = new ArrayList<>();
-        //
-        //   for (PaymentRequest txn : transactions) {
-        //       // T — Target: business ID workflow ID
-        //       String workflowId = "payment-" + txn.getTransactionId();
-        //       workflowIds.add(workflowId);
-        //
-        //       // A — Acquire: typed workflow stub
-        //       PaymentProcessingWorkflow workflow = client.newWorkflowStub(
-        //           PaymentProcessingWorkflow.class,
-        //           WorkflowOptions.newBuilder()
-        //               .setTaskQueue(TASK_QUEUE)
-        //               .setWorkflowId(workflowId)
-        //               .build());
-        //
-        //       // R — Run: fire off workflow (returns CompletableFuture)
-        //       System.out.println("  Starting: " + workflowId);
-        //       futures.add(WorkflowClient.execute(workflow::processPayment, txn));
-        //   }
+           List<CompletableFuture<PaymentResult>> futures = new ArrayList<>();
+           List<String> workflowIds = new ArrayList<>();
+
+           for (PaymentRequest txn : transactions) {
+               // T — Target: business ID workflow ID
+               String workflowId = "payment-" + txn.getTransactionId();
+               workflowIds.add(workflowId);
+
+               // A — Acquire: typed workflow stub
+               PaymentProcessingWorkflow workflow = client.newWorkflowStub(
+                   PaymentProcessingWorkflow.class,
+                   WorkflowOptions.newBuilder()
+                       .setTaskQueue(TaskQueue.TASK_QUEUE)
+                       .setWorkflowId(workflowId)
+                       .build());
+
+               // R — Run: fire off workflow (returns CompletableFuture)
+               System.out.println("  Starting: " + workflowId);
+               futures.add(WorkflowClient.execute(workflow::processPayment, txn));
+           }
 
         // T — Track: Wait for results
         // TODO:
-        //   System.out.println("\nAll workflows started! Waiting for results...");
-        //   System.out.println("High-risk transactions need approval signals.\n");
-        //
-        //   for (int i = 0; i < futures.size(); i++) {
-        //       try {
-        //           PaymentResult result = futures.get(i).get();
-        //           System.out.println("  " + workflowIds.get(i) + " → "
-        //               + result.getStatus()
-        //               + (result.getRiskLevel() != null ? " | Risk: " + result.getRiskLevel() : "")
-        //               + (result.getConfirmationNumber() != null ? " | Conf: " + result.getConfirmationNumber() : ""));
-        //       } catch (InterruptedException | ExecutionException e) {
-        //           System.err.println("  " + workflowIds.get(i) + " → ERROR: " + e.getMessage());
-        //       }
-        //   }
+           System.out.println("\nAll workflows started! Waiting for results...");
+           System.out.println("High-risk transactions need approval signals.\n");
+
+           for (int i = 0; i < futures.size(); i++) {
+               try {
+                   PaymentResult result = futures.get(i).get();
+                   System.out.println("  " + workflowIds.get(i) + " → "
+                       + result.getStatus()
+                       + (result.getRiskLevel() != null ? " | Risk: " + result.getRiskLevel() : "")
+                       + (result.getConfirmationNumber() != null ? " | Conf: " + result.getConfirmationNumber() : ""));
+               } catch (InterruptedException | ExecutionException e) {
+                   System.err.println("  " + workflowIds.get(i) + " → ERROR: " + e.getMessage());
+               }
+           }
 
         System.out.println("\n==========================================================");
         System.out.println("  View in Temporal UI: http://localhost:8233");
