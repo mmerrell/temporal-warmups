@@ -9,69 +9,54 @@ import io.temporal.worker.WorkerFactory;
 /**
  * YOUR TURN: Start the Compliance team's worker.
  *
- * This is mostly the standard worker pattern from previous exercises,
- * but with ONE KEY ADDITION: registerNexusServiceImplementation().
+ * This is the standard CRAWL worker pattern from previous exercises,
+ * with ONE new step: registering the Nexus service implementation.
  *
- * ═══════════════════════════════════════════════════════════════════
- *  KEY NEW CONCEPT: registerNexusServiceImplementation()
- * ═══════════════════════════════════════════════════════════════════
+ * CRAWL pattern — Workers CRAWL before they run:
+ *   C — Connect to Temporal
+ *   R — Register (no workflows in this worker for exercise 1301)
+ *   A — Activities (none — compliance logic lives in the Nexus handler)
+ *   W — Wire the Nexus service handler  ← NEW
+ *   L — Launch
  *
- *   Without this call, the worker ignores all incoming Nexus requests.
- *   With it, Temporal routes Nexus calls to your @ServiceImpl handler.
+ * The key new method is registerNexusServiceImplementation().
+ * Without it, the worker silently ignores all incoming Nexus requests.
+ * With it, Temporal routes calls to your @ServiceImpl handler.
  *
- *     ComplianceAgent agent = new ComplianceAgent();
- *     worker.registerNexusServiceImplementation(new ComplianceNexusServiceImpl(agent));
+ * Compare to what you already know:
+ *   Registering activities: worker.registerActivitiesImplementations(...)
+ *   Registering Nexus:      worker.registerNexusServiceImplementation(...)
+ *   Same shape, different method name.
  *
- *   Compare to registering activities:
- *     worker.registerActivitiesImplementations(new MyActivityImpl());  // familiar
- *     worker.registerNexusServiceImplementation(new ComplianceNexusServiceImpl(...)); // new!
+ * Task queue must be "compliance-risk" — this is what you set as
+ * --target-task-queue when creating the Nexus endpoint via the CLI.
+ * If these strings don't match, Nexus calls will never reach this worker.
  *
- * ── CRAWL pattern (Workers CRAWL before they run) ────────────────
+ * In Exercise 1300, this worker also registers a FraudDetectionWorkflow
+ * and a FraudDetectionActivity for the async Nexus handler.
  *
- *   C — Connect to Temporal (WorkflowServiceStubs + WorkflowClient)
- *   R — Register workflow types (none in this worker — Compliance has no workflows in 1301)
- *   A — Activities (none — compliance logic is in the Nexus handler, not activities)
- *   W — Wire Nexus service handler (registerNexusServiceImplementation)
- *   L — Launch! (factory.start())
- *
- * Task queue: "compliance-risk"
- *   (must match the Nexus endpoint target — see the CLI command in the README)
- *
- * ── In Exercise 1300, this worker also ──────────────────────────
- *   - Registers FraudDetectionWorkflow (an async Nexus handler starts a workflow)
- *   - Registers FraudDetectionActivity (the LLM call wrapped as an activity)
- *
- * ── What to implement ────────────────────────────────────────────
- *
- *   1. Connect to Temporal (WorkflowServiceStubs, WorkflowClient, WorkerFactory)
- *   2. Create a worker on TASK_QUEUE = "compliance-risk"
+ * What to implement:
+ *   1. Connect to Temporal (C)
+ *   2. Create a worker on task queue "compliance-risk" (R)
  *   3. Create a ComplianceAgent instance
- *   4. Call worker.registerNexusServiceImplementation(new ComplianceNexusServiceImpl(agent))
- *   5. Call factory.start()
- *   6. Print a startup banner
+ *   4. Register the Nexus service implementation (W)
+ *   5. Launch the factory (L)
+ *   6. Print a startup banner so you know it's running
  */
 public class ComplianceWorkerApp {
 
-    // TODO: Define TASK_QUEUE = "compliance-risk"
     private static final String TASK_QUEUE = "compliance-risk";
 
     public static void main(String[] args) {
         // TODO: C — Connect to Temporal
-        // WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
-        // WorkflowClient client = WorkflowClient.newInstance(service);
 
-        // TODO: R — Register (none for 1301, but set up the worker)
-        // WorkerFactory factory = WorkerFactory.newInstance(client);
-        // Worker worker = factory.newWorker(TASK_QUEUE);
+        // TODO: R — Create the worker factory and worker on TASK_QUEUE
 
-        // TODO: W — Wire Nexus service handler
-        // ComplianceAgent agent = new ComplianceAgent();
-        // worker.registerNexusServiceImplementation(new ComplianceNexusServiceImpl(agent));
+        // TODO: W — Create a ComplianceAgent and register the Nexus service implementation
 
-        // TODO: L — Launch!
-        // factory.start();
+        // TODO: L — Start the factory
 
         // TODO: Print startup banner
-        System.out.println("TODO: implement ComplianceWorkerApp");
+        throw new UnsupportedOperationException("TODO: implement ComplianceWorkerApp");
     }
 }

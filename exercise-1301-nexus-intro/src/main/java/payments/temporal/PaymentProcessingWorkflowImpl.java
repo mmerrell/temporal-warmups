@@ -22,112 +22,58 @@ import java.time.Duration;
  * ═══════════════════════════════════════════════════════════════════
  *
  * Orchestrate 3 steps:
- *
- *   Step 1: validatePayment   — local activity (same as previous exercises)
- *   Step 2: checkCompliance   — Nexus SYNC call to Compliance team ← NEW!
+ *   Step 1: validatePayment   — local activity (same pattern as previous exercises)
+ *   Step 2: checkCompliance   — Nexus SYNC call to the Compliance team  ← NEW
  *   Step 3: executePayment    — local activity (only if compliance approved)
  *
- * ── KEY NEW CONCEPT: Nexus Service Stub ──────────────────────────
+ * You need three class-level fields:
  *
- * Think of it like creating a REST client, but type-safe and durable:
+ *   1. ACTIVITY_OPTIONS — configure timeout and retry policy for activities.
+ *      A 30-second startToCloseTimeout and 3 max attempts is a good starting point.
  *
- *   // Old way (fragile REST):
- *   HttpClient.post("http://compliance-service/check", request);
+ *   2. paymentActivity stub — create it with Workflow.newActivityStub().
+ *      This is the same pattern you've used since Exercise 01.
  *
- *   // New way (durable Nexus):
- *   ComplianceNexusService complianceService = Workflow.newNexusServiceStub(
- *       ComplianceNexusService.class,
- *       NexusServiceOptions.newBuilder()
- *           .setOperationOptions(NexusOperationOptions.newBuilder()
- *               .setScheduleToCloseTimeout(Duration.ofMinutes(2))
- *               .build())
- *           .build());
+ *   3. complianceService Nexus stub — create it with Workflow.newNexusServiceStub().
+ *      METAPHOR: Same idea as creating an HTTP client, but durable.
+ *      You give it the service interface class and a schedule-to-close timeout.
+ *      It looks like a local Java object but routes calls across team boundaries.
  *
- * Then call it like any local method — Temporal handles the cross-team routing:
+ * Where does "compliance-endpoint" come from?
+ *   Not here — you configure the endpoint name in PaymentsWorkerApp.
+ *   This workflow only knows the SERVICE (ComplianceNexusService).
+ *   The worker knows the ENDPOINT. This keeps the workflow portable.
  *
- *   ComplianceResult result = complianceService.checkCompliance(request);
+ * In processPayment():
+ *   Step 1 — Call validatePayment. If false, return a REJECTED result immediately.
+ *   Step 2 — Build a ComplianceRequest from the PaymentRequest fields, call the
+ *             Nexus stub. If compliance.isApproved() is false, return DECLINED_COMPLIANCE.
+ *             The riskLevel and explanation from the compliance result belong in
+ *             the final PaymentResult — save them.
+ *   Step 3 — Call executePayment. Return a COMPLETED result with the confirmation number.
+ *   Wrap everything in try/catch and return a FAILED result on unexpected errors.
  *
- * The stub looks like a local Java object, but:
- *   - If the Compliance worker is down, Temporal retries the call
- *   - If YOUR worker crashes mid-call, replay picks up where it left off
- *   - The call appears in the Temporal UI as a linked Nexus operation
+ * Logging: Use Workflow.getLogger(), never System.out.println().
+ *   Workflows replay on worker restart. println fires on every replay.
+ *   Workflow.getLogger() is replay-safe — logs only on first execution.
  *
- * ── Where does the "compliance-endpoint" come from? ──────────────
- *
- *   You don't configure it here — that happens in PaymentsWorkerApp.
- *   This workflow just knows the SERVICE (ComplianceNexusService).
- *   The worker knows the ENDPOINT ("compliance-endpoint").
- *   This separation keeps workflows portable.
- *
- * ── What to implement ────────────────────────────────────────────
- *
- *   1. Create ACTIVITY_OPTIONS (startToCloseTimeout: 30s, retries: 3 attempts)
- *
- *   2. Create paymentActivity stub:
- *      PaymentActivity paymentActivity = Workflow.newActivityStub(
- *          PaymentActivity.class, ACTIVITY_OPTIONS);
- *
- *   3. Create complianceService Nexus stub:
- *      ComplianceNexusService complianceService = Workflow.newNexusServiceStub(
- *          ComplianceNexusService.class,
- *          NexusServiceOptions.newBuilder()
- *              .setOperationOptions(NexusOperationOptions.newBuilder()
- *                  .setScheduleToCloseTimeout(Duration.ofMinutes(2))
- *                  .build())
- *              .build());
- *
- *   4. In processPayment(), implement 3 steps:
- *
- *      Step 1 — validatePayment:
- *        boolean valid = paymentActivity.validatePayment(request);
- *        if (!valid) return new PaymentResult(false, txnId, "REJECTED", null, null, null, "Validation failed");
- *
- *      Step 2 — checkCompliance via Nexus:
- *        ComplianceRequest compReq = new ComplianceRequest(
- *            request.getTransactionId(), request.getAmount(),
- *            request.getSenderCountry(), request.getReceiverCountry(),
- *            request.getDescription());
- *        ComplianceResult compliance = complianceService.checkCompliance(compReq);
- *        if (!compliance.isApproved()) {
- *            return new PaymentResult(false, txnId, "DECLINED_COMPLIANCE",
- *                compliance.getRiskLevel(), compliance.getExplanation(), null,
- *                "Declined: " + compliance.getExplanation());
- *        }
- *
- *      Step 3 — executePayment:
- *        String conf = paymentActivity.executePayment(request);
- *        return new PaymentResult(true, txnId, "COMPLETED",
- *            compliance.getRiskLevel(), compliance.getExplanation(), conf, null);
- *
- *   5. Wrap steps in try/catch and return a FAILED result on unexpected errors.
- *
- *   6. Use Workflow.getLogger() for logging — NOT System.out.println()
- *      (workflows replay, so println would fire on every replay)
- *
- * ── In Exercise 1300, this workflow also ────────────────────────
- *   - Makes an ASYNC Nexus call that starts a FraudDetectionWorkflow
- *   - Waits for a human approval signal via Workflow.await()
+ * In Exercise 1300, this workflow also makes an ASYNC Nexus call and
+ * pauses for a human approval signal via Workflow.await().
  */
 public class PaymentProcessingWorkflowImpl implements PaymentProcessingWorkflow {
 
-    // TODO: Create ACTIVITY_OPTIONS
-    // ActivityOptions ACTIVITY_OPTIONS = ActivityOptions.newBuilder()
-    //     .setStartToCloseTimeout(Duration.ofSeconds(30))
-    //     .setRetryOptions(RetryOptions.newBuilder()
-    //         .setMaximumAttempts(3)
-    //         .build())
-    //     .build();
+    // TODO: Create ACTIVITY_OPTIONS (startToCloseTimeout, RetryOptions)
 
-    // TODO: Create paymentActivity stub using Workflow.newActivityStub(...)
+    // TODO: Create a paymentActivity stub using Workflow.newActivityStub()
 
-    // TODO: Create complianceService Nexus stub using Workflow.newNexusServiceStub(...)
+    // TODO: Create a complianceService Nexus stub using Workflow.newNexusServiceStub()
 
     @Override
     public PaymentResult processPayment(PaymentRequest request) {
         // TODO: Implement 3-step orchestration
-        //   Step 1: Validate
-        //   Step 2: checkCompliance via Nexus (the KEY new step)
-        //   Step 3: Execute payment (only if compliance approved)
+        //   Step 1: Validate payment (activity)
+        //   Step 2: Check compliance via Nexus — the key new step
+        //   Step 3: Execute payment (activity, only if approved)
         throw new UnsupportedOperationException("TODO: implement processPayment");
     }
 }

@@ -78,6 +78,8 @@ Each exercise contains:
 - Language-specific implementations (`python/`, `java/`, `go/`, `typescript/`)
 - .svg diagrams to show workflows (similar to exercise-1300)
 - index.html interactive diagram to visually convey temporal workflows (similar to exercise-1301)
+- cool and interesting interactive diagrams embedded in the README to help the student learn
+- Step-by-step guidance, acronyms similar to exercise 1300, metaphors, humor
 
 ## Key Architectural Patterns
 
