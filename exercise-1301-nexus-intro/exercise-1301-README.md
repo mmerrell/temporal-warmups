@@ -302,7 +302,26 @@ public class PaymentActivityImpl implements PaymentActivity {
 
 > **`executePayment` has a 10% failure rate** — `PaymentGateway` randomly throws a `RuntimeException`. Without Temporal, you'd write a retry loop. With activities, Temporal handles it automatically based on the `RetryOptions` you configure in the workflow. You don't write any retry logic here.
 
-> **Checkpoint ✓** If you've done Exercise 01, this is 10 minutes. Two files, each a few lines.
+<details>
+<summary>🧠 Quick check — Phase 1</summary>
+
+**Q: Why delegate to `PaymentGateway` instead of putting the logic directly in the activity?**
+
+<details><summary>Answer</summary>
+
+`PaymentGateway` is a plain Java class with no knowledge of Temporal. Keeping business logic there means it can be tested, reused, and changed without touching Temporal wiring. The activity is just the bridge that makes the gateway call retryable and observable.
+
+</details>
+
+**Q: `executePayment` has a 10% failure rate. Where do you configure how many times Temporal retries it?**
+
+<details><summary>Answer</summary>
+
+In the `RetryOptions` inside `ActivityOptions` in the *workflow* — not in the activity itself. The activity just throws. Temporal catches it and retries based on whatever policy the workflow configured when creating the activity stub.
+
+</details>
+
+</details>
 
 ---
 
@@ -364,7 +383,28 @@ The lambda receives four things:
 >
 > In Exercise 1300, you'll implement both. Here we start with sync only.
 
-> **Checkpoint ✓** The Compliance side is done. One class, one method, one lambda. The `ComplianceAgent` already knows how to call OpenAI and parse the response.
+<details>
+<summary>🧠 Quick check — Phase 2</summary>
+
+**Q: What's the difference between a sync and an async Nexus handler?**
+
+<details><summary>Answer</summary>
+
+A **sync** handler runs inline and returns a result immediately — no new Temporal workflow is started. Good for fast operations like an AI lookup.
+
+An **async** handler starts a *whole new workflow* on the Compliance side and gives the caller a handle to track it. Good for long-running operations that need their own event history. You'll implement async in Exercise 1300.
+
+</details>
+
+**Q: Your handler method is named `checkCompliance()`. What happens if you accidentally name it `handleCompliance()` instead?**
+
+<details><summary>Answer</summary>
+
+Temporal matches handler methods to `@Operation` interface methods by name. A mismatch means the operation has no handler registered — callers get an error at runtime. The method name must be identical to the one in `ComplianceNexusService`.
+
+</details>
+
+</details>
 
 ---
 
@@ -416,7 +456,26 @@ public static void main(String[] args) {
 
 > **Why `"compliance-risk"` as the task queue?** That's the `--target-task-queue` you'll set when creating the Nexus endpoint via CLI. These strings must match exactly — they're how Temporal finds your worker.
 
-> **Checkpoint ✓** The entire Compliance side is now done. The Payments side is next.
+<details>
+<summary>🧠 Quick check — Phase 3</summary>
+
+**Q: What happens if you forget `registerNexusServiceImplementation()` in the Compliance worker?**
+
+<details><summary>Answer</summary>
+
+The worker starts without errors but silently ignores all incoming Nexus requests. The Payments workflow will hang (or time out) waiting for a compliance response that never comes. No exception is thrown — the worker just doesn't know it's supposed to handle Nexus calls.
+
+</details>
+
+**Q: The task queue is `"compliance-risk"`. Where else must this exact string appear, and what breaks if they don't match?**
+
+<details><summary>Answer</summary>
+
+It must match the `--target-task-queue` argument you used in the `temporal operator nexus endpoint create` CLI command. If they don't match, Temporal has no route from the endpoint to the worker — Nexus calls will fail with "endpoint not found" or just never be delivered.
+
+</details>
+
+</details>
 
 ---
 
@@ -558,7 +617,34 @@ PaymentRequest (input)
                     └── goes in PaymentResult
 ```
 
-> **Checkpoint ✓** The Payment workflow is done. Two more files to go — the worker and the starter.
+<details>
+<summary>🧠 Quick check — Phase 4</summary>
+
+**Q: Why must you use `Workflow.getLogger()` instead of `System.out.println()` in workflow code?**
+
+<details><summary>Answer</summary>
+
+Workflows are replayed every time a worker restarts after a crash. During replay, every line of workflow code runs again. `System.out.println()` fires on every replay, flooding your logs with duplicates and making it impossible to tell which execution actually happened. `Workflow.getLogger()` is replay-safe — it suppresses log output during replay.
+
+</details>
+
+**Q: For TXN-C ($75,000 to North Korea), which of the 3 steps appear in the Temporal event history?**
+
+<details><summary>Answer</summary>
+
+Only Steps 1 and 2. The compliance result comes back `approved=false`, so the workflow returns `DECLINED_COMPLIANCE` immediately. `executePayment` (Step 3) is never scheduled — it won't appear in the event history at all. This is one of the things worth looking for in the Temporal UI after you run the starter.
+
+</details>
+
+**Q: Where does `riskLevel` in the final `PaymentResult` come from?**
+
+<details><summary>Answer</summary>
+
+From the `ComplianceResult` returned by the Nexus call in Step 2 — produced by `ComplianceAgent` running on the **Compliance team's worker**. It crosses the Nexus boundary and ends up in a `PaymentResult` owned by the Payments team. Open `ui/trace.html`, go to the Reverse Lookup tab, and see exactly which hop each field comes from.
+
+</details>
+
+</details>
 
 ---
 
@@ -699,7 +785,34 @@ public static void main(String[] args) {
 
 > **Why does `wf.processPayment(txn)` block?** When you call a workflow method on a stub returned by `client.newWorkflowStub()`, it starts the workflow AND blocks the calling thread until it completes. That's the synchronous calling pattern — simple for sequential workloads.
 
-> **Checkpoint ✓** All 6 files complete. Time to run the whole thing!
+<details>
+<summary>🧠 Quick check — Phase 5</summary>
+
+**Q: What's the advantage of `"payment-TXN-A"` as a workflow ID over `"payment-" + UUID.randomUUID()`?**
+
+<details><summary>Answer</summary>
+
+You can find it in the Temporal UI instantly by searching for the transaction ID — no guessing. It's also idempotent: if you re-run the starter with the same transaction, Temporal rejects the duplicate instead of starting a second workflow. With a UUID, every run creates a new workflow with no connection to the business entity it represents.
+
+</details>
+
+**Q: The workflow uses a `ComplianceNexusService` stub but doesn't mention `"compliance-endpoint"` anywhere. Where is that string configured, and why not in the workflow?**
+
+<details><summary>Answer</summary>
+
+It's configured in `PaymentsWorkerApp` via `NexusServiceOptions.setEndpoint("compliance-endpoint")` at workflow registration time. Keeping it out of the workflow means the same workflow code can point at different endpoints in dev, staging, and production just by changing the worker config — no code changes to the workflow needed.
+
+</details>
+
+**Q: `ComplianceWorkerApp` calls `registerNexusServiceImplementation()`. `PaymentsWorkerApp` sets `NexusServiceOptions`. What's the difference in what each does?**
+
+<details><summary>Answer</summary>
+
+`registerNexusServiceImplementation()` is on the **handler side** — it tells the Compliance worker "I can receive and handle Nexus requests." `NexusServiceOptions` is on the **caller side** — it tells the Payments worker "when this workflow makes a Nexus call, route it to this endpoint." One receives, one sends.
+
+</details>
+
+</details>
 
 ---
 
