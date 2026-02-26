@@ -76,10 +76,8 @@ Each exercise contains:
 - `README.md` or `exercise-XX-README.md` - Exercise goals and instructions
 - `pre-temporal.py` or similar - Original code without Temporal
 - Language-specific implementations (`python/`, `java/`, `go/`, `typescript/`)
-- `workflow.py` - Workflow orchestration logic
-- `activities.py` - Activity implementations (non-deterministic operations)
-- `worker.py` - Worker that executes workflows/activities
-- `client.py` - Client that starts workflow executions
+- .svg diagrams to show workflows (similar to exercise-1300)
+- index.html interactive diagram to visually convey temporal workflows (similar to exercise-1301)
 
 ## Key Architectural Patterns
 
