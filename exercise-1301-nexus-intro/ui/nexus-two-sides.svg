@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 490" width="960" height="490">
+
+<defs>
+  <marker id="arr-b" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6 Z" fill="#60a5fa"/>
+  </marker>
+  <marker id="arr-g" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6 Z" fill="#34d399"/>
+  </marker>
+  <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="glow-y" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+</defs>
+
+<style>
+  text { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+  .mono { font-family: 'Courier New', Courier, monospace; }
+
+  @keyframes pulse-match {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.45; }
+  }
+  /* Outgoing call: travels right 55px over 4s cycle */
+  @keyframes flow-r {
+    0%  { transform: translateX(0);    opacity: 0; }
+    4%  { opacity: 1; }
+    21% { transform: translateX(55px); opacity: 1; }
+    25% { transform: translateX(55px); opacity: 0; }
+    26% { transform: translateX(0);    opacity: 0; }
+   100% { transform: translateX(0);    opacity: 0; }
+  }
+  /* Return result: travels left 55px over 4s cycle */
+  @keyframes flow-l {
+    0%  { transform: translateX(0);     opacity: 0; }
+    4%  { opacity: 1; }
+    21% { transform: translateX(-55px); opacity: 1; }
+    25% { transform: translateX(-55px); opacity: 0; }
+    26% { transform: translateX(0);     opacity: 0; }
+   100% { transform: translateX(0);     opacity: 0; }
+  }
+
+  .pulse  { animation: pulse-match 2s ease-in-out infinite; }
+  /* outgoing: Payments→Temporal then Temporal→Compliance, 0.8s stagger */
+  .dot-r1 { animation: flow-r 4s 0.0s infinite; }
+  .dot-r2 { animation: flow-r 4s 0.8s infinite; }
+  /* return:   Compliance→Temporal then Temporal→Payments, start at 2s */
+  .dot-l1 { animation: flow-l 4s 2.0s infinite; }
+  .dot-l2 { animation: flow-l 4s 2.8s infinite; }
+</style>
+
+<!-- Background -->
+<rect width="960" height="490" fill="#0f172a" rx="12"/>
+
+<!-- ══════════════════════════ TITLE ══════════════════════════ -->
+<text x="480" y="36" text-anchor="middle" fill="#f1f5f9" font-size="19" font-weight="700">Two Sides of a Nexus Connection</text>
+<text x="480" y="57" text-anchor="middle" fill="#94a3b8" font-size="12">The workflow defines WHAT to call. The worker config defines WHERE.</text>
+
+<!-- ══════════════════════════ PAYMENTS BOX (left) ══════════════════════════ -->
+<rect x="15"  y="75" width="270" height="345" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+<!-- header -->
+<rect x="15"  y="75" width="270" height="44"  rx="10" fill="#1d4ed8"/>
+<rect x="15"  y="107" width="270" height="12" fill="#1d4ed8"/>
+<text x="150" y="103" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">PAYMENTS WORKER</text>
+<!-- badge -->
+<rect x="33"  y="127" width="214" height="20" rx="10" fill="#1e40af"/>
+<text x="140" y="141" text-anchor="middle" fill="#93c5fd" font-size="10.5">📞  CALLER — sends Nexus calls</text>
+
+<!-- code snippet -->
+<text x="30"  y="172" fill="#4b5563" font-size="9.5" class="mono">// W step — PaymentsWorkerApp.java</text>
+<text x="30"  y="189" fill="#d1d5db" font-size="10"   class="mono">worker.registerWorkflow</text>
+<text x="30"  y="204" fill="#d1d5db" font-size="10"   class="mono">  ImplementationTypes(</text>
+<text x="30"  y="219" fill="#d1d5db" font-size="10"   class="mono">    WFImplOptions.newBuilder()</text>
+<text x="30"  y="234" fill="#d1d5db" font-size="10"   class="mono">      .setNexusServiceOptions(</text>
+<text x="30"  y="249" fill="#d1d5db" font-size="10"   class="mono">        "ComplianceNexusSvc",</text>
+<text x="30"  y="264" fill="#d1d5db" font-size="10"   class="mono">        NexusSvcOptions.newBuilder()</text>
+<text x="30"  y="279" fill="#d1d5db" font-size="10"   class="mono">          .setEndpoint(</text>
+<!-- highlighted matching string -->
+<rect x="88"  y="286" width="162" height="17" rx="3"  fill="#78350f" class="pulse" filter="url(#glow-y)"/>
+<text x="92"  y="298" fill="#fbbf24" font-size="10.5" class="mono" font-weight="700">"compliance-endpoint"</text>
+<text x="30"  y="316" fill="#d1d5db" font-size="10"   class="mono">          )...)</text>
+
+<!-- explanation -->
+<text x="150" y="350" text-anchor="middle" fill="#60a5fa" font-size="10.5">Maps interface name → endpoint</text>
+<text x="150" y="365" text-anchor="middle" fill="#60a5fa" font-size="10.5">Workflow stays portable — no URL here</text>
+<text x="150" y="386" text-anchor="middle" fill="#64748b" font-size="10" font-style="italic">Like application.properties injecting</text>
+<text x="150" y="400" text-anchor="middle" fill="#64748b" font-size="10" font-style="italic">a URL — wired at startup, not in code</text>
+
+<!-- ══════════════════════════ TEMPORAL SERVER BOX (center) ══════════════════════════ -->
+<rect x="345" y="95"  width="270" height="290" rx="10" fill="#1e293b" stroke="#14b8a6" stroke-width="2"/>
+<!-- header -->
+<rect x="345" y="95"  width="270" height="44"  rx="10" fill="#0f766e"/>
+<rect x="345" y="127" width="270" height="12"  fill="#0f766e"/>
+<text x="480" y="123" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">TEMPORAL SERVER</text>
+<text x="480" y="153" text-anchor="middle" fill="#5eead4" font-size="11">Nexus Endpoint Registry</text>
+
+<!-- CLI endpoint inner box -->
+<rect x="363" y="163" width="234" height="140" rx="8" fill="#134e4a" stroke="#2dd4bf" stroke-width="1.5" stroke-dasharray="6,3"/>
+<text x="480" y="181" text-anchor="middle" fill="#5eead4" font-size="10.5" font-weight="600">temporal operator nexus endpoint create</text>
+<line x1="363" y1="187" x2="597" y2="187" stroke="#2dd4bf" stroke-width="0.5"/>
+
+<text x="378" y="205" fill="#9ca3af" font-size="10"  class="mono">--name</text>
+<rect x="426" y="194" width="157" height="15" rx="3" fill="#78350f" class="pulse" filter="url(#glow-y)"/>
+<text x="429" y="206" fill="#fbbf24" font-size="10"  class="mono" font-weight="700">"compliance-endpoint"</text>
+
+<text x="378" y="228" fill="#9ca3af" font-size="10"  class="mono">--target-namespace  default</text>
+<text x="378" y="243" fill="#9ca3af" font-size="10"  class="mono">--target-task-queue</text>
+<text x="378" y="258" fill="#e2e8f0" font-size="10"  class="mono">"compliance-risk"</text>
+<text x="378" y="277" fill="#9ca3af" font-size="10">→ routes to compliance worker</text>
+<text x="378" y="291" fill="#9ca3af" font-size="10">   on that task queue</text>
+
+<text x="480" y="333" text-anchor="middle" fill="#5eead4"  font-size="10">Run once via CLI before starting workers</text>
+<text x="480" y="350" text-anchor="middle" fill="#64748b"  font-size="10" font-style="italic">This is the glue between both teams</text>
+<text x="480" y="365" text-anchor="middle" fill="#64748b"  font-size="10" font-style="italic">Neither team imports the other's code</text>
+
+<!-- ══════════════════════════ COMPLIANCE BOX (right) ══════════════════════════ -->
+<rect x="675" y="75"  width="270" height="345" rx="10" fill="#1e293b" stroke="#8b5cf6" stroke-width="2"/>
+<!-- header -->
+<rect x="675" y="75"  width="270" height="44"  rx="10" fill="#6d28d9"/>
+<rect x="675" y="107" width="270" height="12"  fill="#6d28d9"/>
+<text x="810" y="103" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="700">COMPLIANCE WORKER</text>
+<!-- badge -->
+<rect x="693" y="127" width="234" height="20" rx="10" fill="#5b21b6"/>
+<text x="810" y="141" text-anchor="middle" fill="#c4b5fd" font-size="10.5">📟  HANDLER — receives Nexus calls</text>
+
+<!-- code snippet -->
+<text x="690" y="172" fill="#4b5563" font-size="9.5" class="mono">// W step — ComplianceWorkerApp.java</text>
+<text x="690" y="189" fill="#d1d5db" font-size="10"  class="mono">Worker worker = factory.newWorker(</text>
+<text x="690" y="204" fill="#e2e8f0" font-size="10"  class="mono">  "compliance-risk");  // ← matches CLI</text>
+<text x="690" y="224" fill="#d1d5db" font-size="10"  class="mono">worker</text>
+<text x="690" y="239" fill="#d1d5db" font-size="10"  class="mono">  .registerNexus</text>
+<text x="690" y="254" fill="#d1d5db" font-size="10"  class="mono">    ServiceImplementation(</text>
+<text x="690" y="269" fill="#d1d5db" font-size="10"  class="mono">      new ComplianceNexus</text>
+<text x="690" y="284" fill="#d1d5db" font-size="10"  class="mono">        ServiceImpl(agent));</text>
+
+<!-- explanation -->
+<text x="810" y="318" text-anchor="middle" fill="#a78bfa" font-size="10.5">Registers handler to answer</text>
+<text x="810" y="333" text-anchor="middle" fill="#a78bfa" font-size="10.5">incoming Nexus requests</text>
+<text x="810" y="355" text-anchor="middle" fill="#64748b" font-size="10" font-style="italic">Like plugging in a phone —</text>
+<text x="810" y="369" text-anchor="middle" fill="#64748b" font-size="10" font-style="italic">this office now answers the line</text>
+<text x="810" y="390" text-anchor="middle" fill="#64748b" font-size="10" font-style="italic">Omit this call → worker starts but</text>
+<text x="810" y="404" text-anchor="middle" fill="#64748b" font-size="10" font-style="italic">silently ignores all Nexus requests</text>
+
+<!-- ══════════════════════════ ARROWS ══════════════════════════ -->
+<!-- outgoing call (upper y=221, pointing right) -->
+<line x1="289" y1="221" x2="338" y2="221" stroke="#60a5fa" stroke-width="2" marker-end="url(#arr-b)"/>
+<line x1="619" y1="221" x2="668" y2="221" stroke="#60a5fa" stroke-width="2" marker-end="url(#arr-b)"/>
+<!-- return result (lower y=246, pointing left) -->
+<line x1="672" y1="246" x2="623" y2="246" stroke="#34d399" stroke-width="2" marker-end="url(#arr-g)"/>
+<line x1="342" y1="246" x2="293" y2="246" stroke="#34d399" stroke-width="2" marker-end="url(#arr-g)"/>
+
+<!-- arrow labels -->
+<text x="314" y="217" text-anchor="middle" fill="#60a5fa" font-size="9">call</text>
+<text x="644" y="217" text-anchor="middle" fill="#60a5fa" font-size="9">route</text>
+<text x="648" y="260" text-anchor="middle" fill="#34d399" font-size="9">result</text>
+<text x="317" y="260" text-anchor="middle" fill="#34d399" font-size="9">return</text>
+
+<!-- ══════════════════════════ ANIMATED DOTS ══════════════════════════ -->
+<!-- outgoing: Payments → Temporal (blue, starts at gap start) -->
+<circle cx="289" cy="221" r="5" fill="#60a5fa" opacity="0" class="dot-r1" filter="url(#glow)"/>
+<!-- outgoing: Temporal → Compliance (blue, staggered) -->
+<circle cx="619" cy="221" r="5" fill="#60a5fa" opacity="0" class="dot-r2" filter="url(#glow)"/>
+<!-- return: Compliance → Temporal (green, reversed direction) -->
+<circle cx="672" cy="246" r="5" fill="#34d399" opacity="0" class="dot-l1" filter="url(#glow)"/>
+<!-- return: Temporal → Payments (green, staggered) -->
+<circle cx="342" cy="246" r="5" fill="#34d399" opacity="0" class="dot-l2" filter="url(#glow)"/>
+
+<!-- ══════════════════════════ BOTTOM MATCH INDICATOR ══════════════════════════ -->
+<line x1="150" y1="440" x2="480" y2="440" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.7"/>
+<line x1="480" y1="440" x2="810" y2="440" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.7"/>
+<circle cx="150" cy="440" r="3.5" fill="#fbbf24" opacity="0.9"/>
+<circle cx="480" cy="440" r="3.5" fill="#fbbf24" opacity="0.9"/>
+<circle cx="810" cy="440" r="3.5" fill="#fbbf24" opacity="0.9"/>
+
+<text x="480" y="458" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="600">"compliance-endpoint" must match across all three — caller config, server registry, handler task queue</text>
+<text x="480" y="474" text-anchor="middle" fill="#64748b" font-size="10">If any string differs: no error thrown — the call simply never arrives. Debug tip: check all three places first.</text>
+
+</svg>

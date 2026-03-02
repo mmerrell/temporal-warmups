@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hop-by-Hop Data Trace — Exercise 1301</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --payments-color: #58a6ff;
+    --payments-bg: rgba(88,166,255,0.07);
+    --payments-border: rgba(88,166,255,0.25);
+    --compliance-color: #3fb950;
+    --compliance-bg: rgba(63,185,80,0.07);
+    --compliance-border: rgba(63,185,80,0.25);
+    --nexus-color: #f0883e;
+    --nexus-glow: rgba(240,136,62,0.35);
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --panel-bg: #1c2128;
+    --low: #3fb950;
+    --medium: #f0883e;
+    --high: #f85149;
+    --code-bg: #0d1117;
+    --hover-bg: rgba(255,255,255,0.04);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 13px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .badge { background: rgba(240,136,62,0.12); color: var(--nexus-color); border: 1px solid rgba(240,136,62,0.3); border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 700; letter-spacing: .05em; }
+  header h1 { font-size: 15px; font-weight: 600; }
+  .back-link { margin-left: auto; color: var(--muted); font-size: 13px; text-decoration: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 12px; }
+  .back-link:hover { color: var(--text); border-color: var(--muted); }
+
+  /* ── TXN selector bar ── */
+  .selector-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .selector-bar label { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  .txn-btn {
+    padding: 5px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all .15s;
+  }
+  .txn-btn:hover { border-color: var(--muted); color: var(--text); }
+  .txn-btn.active { border-color: var(--nexus-color); color: var(--nexus-color); background: rgba(240,136,62,0.08); }
+  .txn-desc { margin-left: 8px; color: var(--muted); font-size: 13px; }
+  .txn-desc strong { color: var(--text); }
+
+  /* ── Main layout ── */
+  .main { flex: 1; display: flex; overflow: hidden; }
+
+  /* ── Timeline column ── */
+  .timeline {
+    width: 420px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    padding: 24px 20px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Hop card */
+  .hop-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    cursor: pointer;
+    transition: all .15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .hop-card:hover { background: var(--hover-bg); border-color: var(--muted); transform: translateX(2px); }
+  .hop-card.selected { border-color: var(--nexus-color); box-shadow: 0 0 0 1px rgba(240,136,62,0.2), 0 2px 12px rgba(240,136,62,0.1); }
+  .hop-card.skipped { opacity: .38; pointer-events: none; }
+  .hop-card.skipped::after {
+    content: 'SKIPPED';
+    position: absolute; inset: 0;
+    background: rgba(13,17,23,0.55);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: var(--high);
+    letter-spacing: .1em;
+    pointer-events: none;
+  }
+
+  /* Team color strip */
+  .hop-card .team-strip {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 10px 0 0 10px;
+  }
+  .hop-card.payments .team-strip { background: var(--payments-color); }
+  .hop-card.compliance .team-strip { background: var(--compliance-color); }
+
+  .hop-inner { padding: 12px 14px 12px 20px; }
+
+  .hop-header { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .hop-num {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .payments .hop-num { background: rgba(88,166,255,0.15); color: var(--payments-color); }
+  .compliance .hop-num { background: rgba(63,185,80,0.15); color: var(--compliance-color); }
+
+  .hop-title { font-size: 13px; font-weight: 600; }
+  .hop-team { font-size: 11px; font-weight: 600; letter-spacing: .06em; margin-left: auto; }
+  .payments .hop-team { color: var(--payments-color); }
+  .compliance .hop-team { color: var(--compliance-color); }
+
+  .hop-desc { font-size: 12px; color: var(--muted); margin-bottom: 8px; line-height: 1.4; }
+
+  /* Payload type badges */
+  .payload-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+  .payload-label { color: var(--muted); min-width: 38px; }
+  .payload-type {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 11px;
+    color: var(--payments-color);
+  }
+  .compliance .payload-type { color: var(--compliance-color); }
+  .payload-arrow { color: var(--muted); font-size: 10px; }
+
+  /* Connector between hops */
+  .connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 2px 0;
+    position: relative;
+  }
+  .connector-line {
+    width: 2px;
+    height: 18px;
+    background: var(--border);
+  }
+  .connector-label {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    white-space: nowrap;
+  }
+
+  /* Nexus boundary divider */
+  .nexus-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    position: relative;
+  }
+  .nexus-divider::before, .nexus-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--nexus-color));
+  }
+  .nexus-divider::after { background: linear-gradient(to left, transparent, var(--nexus-color)); }
+  .nexus-divider .nd-label {
+    background: rgba(240,136,62,0.1);
+    border: 1px solid rgba(240,136,62,0.35);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--nexus-color);
+    letter-spacing: .06em;
+    white-space: nowrap;
+    box-shadow: 0 0 12px var(--nexus-glow);
+  }
+
+  /* Decline branch indicator */
+  .decline-branch {
+    display: none;
+    margin: 4px 0;
+    border: 1px dashed var(--high);
+    border-radius: 8px;
+    padding: 8px 12px;
+    background: rgba(248,81,73,0.06);
+    font-size: 12px;
+    color: var(--high);
+    text-align: center;
+  }
+  .decline-branch.visible { display: block; }
+
+  /* ── Detail panel ── */
+  .detail-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .panel-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    color: var(--muted);
+    text-align: center;
+    gap: 8px;
+  }
+  .panel-placeholder .arrow { font-size: 28px; color: var(--border); margin-bottom: 4px; }
+  .panel-placeholder p { font-size: 13px; line-height: 1.6; max-width: 260px; }
+
+  /* Panel sections */
+  .p-section { display: flex; flex-direction: column; gap: 8px; }
+  .p-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .p-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .hop-title-row { display: flex; align-items: center; gap: 10px; }
+  .hop-title-row h2 { font-size: 17px; font-weight: 700; }
+  .team-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 4px;
+    letter-spacing: .05em;
+  }
+  .team-badge.payments { background: rgba(88,166,255,0.12); color: var(--payments-color); border: 1px solid var(--payments-border); }
+  .team-badge.compliance { background: rgba(63,185,80,0.12); color: var(--compliance-color); border: 1px solid var(--compliance-border); }
+  .nexus-badge { background: rgba(240,136,62,0.12); color: var(--nexus-color); border: 1px solid rgba(240,136,62,0.3); font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 4px; letter-spacing: .05em; }
+
+  .p-desc { font-size: 13px; color: var(--muted); line-height: 1.65; }
+  .p-desc strong { color: var(--text); }
+
+  /* Data object box */
+  .data-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .data-box .type-name { color: var(--nexus-color); font-weight: 700; margin-bottom: 4px; display: block; }
+  .data-box .field { display: flex; gap: 8px; }
+  .data-box .field-name { color: var(--payments-color); min-width: 130px; flex-shrink: 0; }
+  .compliance .data-box .field-name { color: var(--compliance-color); }
+  .data-box .field-val { color: #a5d6ff; }
+  .data-box .field-val.green { color: #7ee787; }
+  .data-box .field-val.orange { color: var(--nexus-color); }
+  .data-box .field-val.red { color: var(--high); }
+  .data-box .field-val.muted { color: var(--muted); }
+  .data-box .arrow-row { color: var(--muted); font-size: 11px; margin: 4px 0; }
+
+  /* Insight callout */
+  .insight {
+    background: rgba(240,136,62,0.06);
+    border-left: 3px solid var(--nexus-color);
+    border-radius: 0 6px 6px 0;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .insight.green { background: rgba(63,185,80,0.06); border-left-color: var(--compliance-color); }
+  .insight.red { background: rgba(248,81,73,0.06); border-left-color: var(--high); }
+
+  /* Reverse lookup table */
+  .rl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .rl-table th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  .rl-table td { padding: 7px 10px; border-bottom: 1px solid rgba(48,54,61,0.5); vertical-align: top; }
+  .rl-table tr:last-child td { border-bottom: none; }
+  .rl-table .field-col { font-family: 'SFMono-Regular', Consolas, monospace; color: var(--payments-color); font-size: 12px; }
+  .rl-table .val-col { font-family: 'SFMono-Regular', Consolas, monospace; color: #a5d6ff; font-size: 12px; }
+  .rl-table .src-col { color: var(--muted); font-size: 12px; }
+  .rl-table .hop-ref {
+    display: inline-block;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .1s;
+  }
+  .rl-table .hop-ref:hover { border-color: var(--nexus-color); color: var(--nexus-color); }
+  .rl-table .hop-ref.payments { color: var(--payments-color); }
+  .rl-table .hop-ref.compliance { color: var(--compliance-color); }
+  .rl-table tr.highlighted td { background: rgba(240,136,62,0.06); }
+
+  /* Tab switcher at bottom */
+  .panel-tabs {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    padding: 0 24px;
+    display: flex;
+    gap: 0;
+  }
+  .tab-btn {
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    border-bottom: 2px solid transparent;
+    transition: all .15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--text); border-bottom-color: var(--nexus-color); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">TRACE</div>
+  <h1>Hop-by-Hop Data Trace — Exercise 1301</h1>
+  <a class="back-link" href="nexus-workflow.html">← Flow diagram</a>
+</header>
+
+<div class="selector-bar">
+  <label>Transaction:</label>
+  <button class="txn-btn" data-t="A" onclick="selectTxn('A',this)">TXN-A · $250 · US→US</button>
+  <button class="txn-btn active" data-t="B" onclick="selectTxn('B',this)">TXN-B · $12,000 · US→UK</button>
+  <button class="txn-btn" data-t="C" onclick="selectTxn('C',this)">TXN-C · $75,000 · US→🚫</button>
+  <span class="txn-desc" id="txnDesc"><strong>TXN-B</strong> — medium-risk path, touches all 5 hops</span>
+</div>
+
+<div class="main">
+
+  <!-- ── Timeline ── -->
+  <div class="timeline">
+
+    <!-- HOP 1 -->
+    <div class="hop-card payments" id="card1" onclick="selectHop(1)">
+      <div class="team-strip"></div>
+      <div class="hop-inner">
+        <div class="hop-header">
+          <div class="hop-num">1</div>
+          <div class="hop-title">PaymentStarter</div>
+          <div class="hop-team">PAYMENTS</div>
+        </div>
+        <div class="hop-desc">Creates workflow stub with business ID, fires processPayment()</div>
+        <div class="payload-row">
+          <span class="payload-label">sends</span>
+          <span class="payload-type">PaymentRequest</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector">
+      <div class="connector-line"></div>
+      <div class="connector-label" id="conn1">PaymentRequest</div>
+      <div class="connector-line"></div>
+    </div>
+
+    <!-- HOP 2 -->
+    <div class="hop-card payments" id="card2" onclick="selectHop(2)">
+      <div class="team-strip"></div>
+      <div class="hop-inner">
+        <div class="hop-header">
+          <div class="hop-num">2</div>
+          <div class="hop-title">validatePayment activity</div>
+          <div class="hop-team">PAYMENTS</div>
+        </div>
+        <div class="hop-desc">Delegates to PaymentGateway — checks amount & accounts</div>
+        <div class="payload-row">
+          <span class="payload-label">in</span>
+          <span class="payload-type">PaymentRequest</span>
+          <span class="payload-arrow">→</span>
+          <span class="payload-label">out</span>
+          <span class="payload-type">boolean</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="nexus-divider">
+      <div class="nd-label">⚡ NEXUS BOUNDARY</div>
+    </div>
+
+    <!-- HOP 3 -->
+    <div class="hop-card compliance" id="card3" onclick="selectHop(3)">
+      <div class="team-strip"></div>
+      <div class="hop-inner">
+        <div class="hop-header">
+          <div class="hop-num">3</div>
+          <div class="hop-title">checkCompliance (Nexus sync)</div>
+          <div class="hop-team">COMPLIANCE</div>
+        </div>
+        <div class="hop-desc">ComplianceNexusServiceImpl → ComplianceAgent → OpenAI</div>
+        <div class="payload-row">
+          <span class="payload-label">in</span>
+          <span class="payload-type" style="color:var(--compliance-color)">ComplianceRequest</span>
+          <span class="payload-arrow">→</span>
+          <span class="payload-label">out</span>
+          <span class="payload-type" style="color:var(--compliance-color)">ComplianceResult</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="nexus-divider">
+      <div class="nd-label">⚡ NEXUS BOUNDARY</div>
+    </div>
+
+    <!-- Decline branch (shown for TXN-C) -->
+    <div class="decline-branch" id="declineBranch">
+      🚫 compliance.isApproved() == false → workflow returns DECLINED_COMPLIANCE<br>
+      Hops 4 &amp; 5 never execute
+    </div>
+
+    <div class="connector" id="conn34wrap">
+      <div class="connector-line"></div>
+      <div class="connector-label" id="conn3">ComplianceResult</div>
+      <div class="connector-line"></div>
+    </div>
+
+    <!-- HOP 4 -->
+    <div class="hop-card payments" id="card4" onclick="selectHop(4)">
+      <div class="team-strip"></div>
+      <div class="hop-inner">
+        <div class="hop-header">
+          <div class="hop-num">4</div>
+          <div class="hop-title">executePayment activity</div>
+          <div class="hop-team">PAYMENTS</div>
+        </div>
+        <div class="hop-desc">PaymentGateway.executePayment() — 10% failure, auto-retried</div>
+        <div class="payload-row">
+          <span class="payload-label">in</span>
+          <span class="payload-type">PaymentRequest</span>
+          <span class="payload-arrow">→</span>
+          <span class="payload-label">out</span>
+          <span class="payload-type">String</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector" id="conn45wrap">
+      <div class="connector-line"></div>
+      <div class="connector-label" id="conn4">String (confirmationNumber)</div>
+      <div class="connector-line"></div>
+    </div>
+
+    <!-- HOP 5 -->
+    <div class="hop-card payments" id="card5" onclick="selectHop(5)">
+      <div class="team-strip"></div>
+      <div class="hop-inner">
+        <div class="hop-header">
+          <div class="hop-num">5</div>
+          <div class="hop-title">PaymentResult assembled</div>
+          <div class="hop-team">PAYMENTS</div>
+        </div>
+        <div class="hop-desc">Workflow collects all hop outputs → returns result to starter</div>
+        <div class="payload-row">
+          <span class="payload-label">out</span>
+          <span class="payload-type">PaymentResult</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /timeline -->
+
+  <!-- ── Right panel ── -->
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+
+    <div class="detail-panel" id="detailPanel">
+      <div class="panel-placeholder" id="placeholder">
+        <div class="arrow">←</div>
+        <strong>Click a hop</strong>
+        <p>See the exact Java objects that flow in and out of each step — and where each field goes.</p>
+      </div>
+    </div>
+
+    <div class="panel-tabs">
+      <button class="tab-btn active" id="tabHop" onclick="switchTab('hop')">Hop detail</button>
+      <button class="tab-btn" id="tabRL" onclick="switchTab('rl')">Reverse lookup</button>
+    </div>
+
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ── State ─────────────────────────────────────────────────────────
+let currentTxn = 'B';
+let currentHop = null;
+let currentTab = 'hop';
+
+const TXN = {
+  A: {
+    id:'TXN-A', amount:250.00, currency:'USD', sender:'US', receiver:'US',
+    desc:'Routine supplier payment', senderAcc:'ACC-001', receiverAcc:'ACC-002',
+    label: 'TXN-A — low-risk, domestic, all 5 hops run',
+    risk:'LOW', approved:true,
+    explanation:'Routine domestic transfer, no regulatory concerns.',
+    conf:'CONF-TXN-A-1709234500000',
+    riskColor:'green',
+  },
+  B: {
+    id:'TXN-B', amount:12000.00, currency:'USD', sender:'US', receiver:'UK',
+    desc:'International consulting fee', senderAcc:'ACC-003', receiverAcc:'ACC-004',
+    label: 'TXN-B — medium-risk path, touches all 5 hops',
+    risk:'MEDIUM', approved:true,
+    explanation:'International transfer above $10K threshold; approved with AML note.',
+    conf:'CONF-TXN-B-1709234567890',
+    riskColor:'orange',
+  },
+  C: {
+    id:'TXN-C', amount:75000.00, currency:'USD', sender:'US', receiver:'North Korea',
+    desc:'Business consulting services', senderAcc:'ACC-005', receiverAcc:'ACC-006',
+    label: 'TXN-C — HIGH risk, declined at Hop 3, Hops 4 & 5 skipped',
+    risk:'HIGH', approved:false,
+    explanation:'Destination country is OFAC-sanctioned. Transaction blocked.',
+    conf:null,
+    riskColor:'red',
+  },
+};
+
+// ── Hop detail content ────────────────────────────────────────────
+function hopContent(hopNum, t) {
+  const tx = TXN[t];
+  const fmtAmt = '$' + tx.amount.toLocaleString('en-US', {minimumFractionDigits:2});
+
+  const hop1 = `
+    <div class="hop-title-row">
+      <h2>Hop 1 — PaymentStarter</h2>
+      <span class="team-badge payments">PAYMENTS TEAM</span>
+    </div>
+    <div class="p-desc">
+      Client code (plain Java, not a workflow). Connects to Temporal, creates a typed workflow stub
+      with a <strong>business ID</strong>, and calls <code>processPayment()</code> — which blocks
+      until the workflow completes and returns a <code>PaymentResult</code>.
+    </div>
+
+    <div class="p-section">
+      <div class="p-section-title">Workflow ID</div>
+      <div class="data-box payments">
+        <span class="type-name">// Business ID pattern (not a random UUID)</span>
+        <div class="field"><span class="field-name">workflowId</span><span class="field-val">"payment-${tx.id}"</span></div>
+      </div>
+    </div>
+
+    <div class="p-section">
+      <div class="p-section-title">Input fired into workflow</div>
+      <div class="data-box payments">
+        <span class="type-name">PaymentRequest</span>
+        <div class="field"><span class="field-name">transactionId</span><span class="field-val">"${tx.id}"</span></div>
+        <div class="field"><span class="field-name">amount</span><span class="field-val">${tx.amount}</span></div>
+        <div class="field"><span class="field-name">currency</span><span class="field-val">"${tx.currency}"</span></div>
+        <div class="field"><span class="field-name">senderCountry</span><span class="field-val">"${tx.sender}"</span></div>
+        <div class="field"><span class="field-name">receiverCountry</span><span class="field-val">"${tx.receiver}"</span></div>
+        <div class="field"><span class="field-name">description</span><span class="field-val">"${tx.desc}"</span></div>
+        <div class="field"><span class="field-name">senderAccount</span><span class="field-val">"${tx.senderAcc}"</span></div>
+        <div class="field"><span class="field-name">receiverAccount</span><span class="field-val">"${tx.receiverAcc}"</span></div>
+      </div>
+    </div>
+
+    <div class="insight">
+      <strong>Business IDs matter.</strong> Using <code>"payment-${tx.id}"</code> instead of a UUID means you
+      can find this workflow instantly in the Temporal UI — just search the transaction ID. Idempotent too:
+      re-running the starter with the same ID is a no-op, not a duplicate payment.
+    </div>`;
+
+  const hop2 = `
+    <div class="hop-title-row">
+      <h2>Hop 2 — validatePayment</h2>
+      <span class="team-badge payments">PAYMENTS TEAM</span>
+    </div>
+    <div class="p-desc">
+      A Temporal <strong>activity</strong> that delegates to <code>PaymentGateway.validatePayment()</code>.
+      Checks that amount is positive and both accounts are non-null.
+      The <code>PaymentRequest</code> object passes through unchanged.
+    </div>
+
+    <div class="p-section">
+      <div class="p-section-title">Input</div>
+      <div class="data-box payments">
+        <span class="type-name">PaymentRequest (same object from Hop 1)</span>
+        <div class="field"><span class="field-name">amount</span><span class="field-val">${tx.amount} &gt; 0 ✓</span></div>
+        <div class="field"><span class="field-name">senderAccount</span><span class="field-val">"${tx.senderAcc}" non-null ✓</span></div>
+        <div class="field"><span class="field-name">receiverAccount</span><span class="field-val">"${tx.receiverAcc}" non-null ✓</span></div>
+      </div>
+    </div>
+
+    <div class="p-section">
+      <div class="p-section-title">Output</div>
+      <div class="data-box payments">
+        <span class="type-name">boolean</span>
+        <div class="field"><span class="field-name">result</span><span class="field-val green">true</span></div>
+      </div>
+    </div>
+
+    <div class="insight">
+      <strong>Activities are thin wrappers.</strong> All business logic lives in <code>PaymentGateway</code>.
+      The activity just makes it retryable by Temporal — if the gateway throws, Temporal retries
+      based on the <code>RetryOptions</code> in the workflow. No retry code written here.
+    </div>`;
+
+  const hop3approved = tx.approved;
+  const hop3 = `
+    <div class="hop-title-row">
+      <h2>Hop 3 — checkCompliance</h2>
+      <span class="team-badge compliance">COMPLIANCE TEAM</span>
+      <span class="nexus-badge">NEXUS SYNC</span>
+    </div>
+    <div class="p-desc">
+      The workflow calls <code>complianceService.checkCompliance(compReq)</code> — looks like a
+      local method call, but Temporal routes it across the team boundary via the
+      <code>compliance-endpoint</code> Nexus endpoint to the Compliance worker.
+      The <code>ComplianceNexusServiceImpl</code> sync handler receives it and calls
+      <code>ComplianceAgent.checkCompliance()</code> → OpenAI.
+    </div>
+
+    <div class="p-section">
+      <div class="p-section-title">Input (built from PaymentRequest fields)</div>
+      <div class="data-box compliance">
+        <span class="type-name">ComplianceRequest</span>
+        <div class="field"><span class="field-name">transactionId</span><span class="field-val">"${tx.id}"  ← request.getTransactionId()</span></div>
+        <div class="field"><span class="field-name">amount</span><span class="field-val">${tx.amount}  ← request.getAmount()</span></div>
+        <div class="field"><span class="field-name">senderCountry</span><span class="field-val">"${tx.sender}"  ← request.getSenderCountry()</span></div>
+        <div class="field"><span class="field-name">receiverCountry</span><span class="field-val">"${tx.receiver}"  ← request.getReceiverCountry()</span></div>
+        <div class="field"><span class="field-name">description</span><span class="field-val">"${tx.desc}"  ← request.getDescription()</span></div>
+      </div>
+    </div>
+
+    <div class="p-section">
+      <div class="p-section-title">Output — AI compliance decision</div>
+      <div class="data-box compliance">
+        <span class="type-name">ComplianceResult</span>
+        <div class="field"><span class="field-name">transactionId</span><span class="field-val">"${tx.id}"</span></div>
+        <div class="field"><span class="field-name">approved</span><span class="field-val ${hop3approved?'green':'red'}">${hop3approved}</span></div>
+        <div class="field"><span class="field-name">riskLevel</span><span class="field-val ${tx.riskColor}">"${tx.risk}"</span></div>
+        <div class="field"><span class="field-name">explanation</span><span class="field-val">"${tx.explanation}"</span></div>
+      </div>
+    </div>
+
+    ${hop3approved
+      ? `<div class="insight green"><strong>approved=true → continue.</strong> riskLevel and explanation will travel all the way to the final <code>PaymentResult</code>. They originate here — on the Compliance side.</div>`
+      : `<div class="insight red"><strong>approved=false → workflow stops here.</strong> The workflow immediately returns <code>DECLINED_COMPLIANCE</code>. <code>executePayment</code> is never called — Hops 4 and 5 do not appear in the event history.</div>`
+    }`;
+
+  const hop4 = `
+    <div class="hop-title-row">
+      <h2>Hop 4 — executePayment</h2>
+      <span class="team-badge payments">PAYMENTS TEAM</span>
+    </div>
+    <div class="p-desc">
+      Only reached when <code>compliance.isApproved() == true</code>.
+      Calls <code>PaymentGateway.executePayment()</code> to process the actual transfer.
+      The gateway has a <strong>10% random failure rate</strong> — Temporal retries automatically
+      per the <code>RetryOptions</code> configured in the workflow.
+    </div>
+
+    <div class="p-section">
+      <div class="p-section-title">Input (original request, unchanged since Hop 1)</div>
+      <div class="data-box payments">
+        <span class="type-name">PaymentRequest (same object)</span>
+        <div class="field"><span class="field-name">transactionId</span><span class="field-val">"${tx.id}"</span></div>
+        <div class="field"><span class="field-name">amount</span><span class="field-val">${tx.amount}</span></div>
+        <div class="field"><span class="field-name">senderCountry</span><span class="field-val">"${tx.sender}"</span></div>
+        <div class="field"><span class="field-name">receiverCountry</span><span class="field-val">"${tx.receiver}"</span></div>
+      </div>
+    </div>
+
+    <div class="p-section">
+      <div class="p-section-title">Output</div>
+      <div class="data-box payments">
+        <span class="type-name">String (confirmation number)</span>
+        <div class="field"><span class="field-name">confirmationNumber</span><span class="field-val green">"${tx.conf || 'CONF-' + tx.id + '-...'}"</span></div>
+      </div>
+    </div>
+
+    <div class="insight">
+      <strong>Why pass the whole PaymentRequest again?</strong> The gateway needs the account numbers
+      to route the transfer. The workflow holds a reference to the original <code>request</code>
+      object — no need to re-package anything. Activities receive whatever you pass them.
+    </div>`;
+
+  const hop5 = `
+    <div class="hop-title-row">
+      <h2>Hop 5 — PaymentResult assembled</h2>
+      <span class="team-badge payments">PAYMENTS TEAM</span>
+    </div>
+    <div class="p-desc">
+      The workflow collects outputs from all previous hops and builds the final <code>PaymentResult</code>,
+      which is returned to <code>PaymentStarter</code> where <code>stub.processPayment()</code> unblocks.
+    </div>
+
+    <div class="p-section">
+      <div class="p-section-title">Output — field origins annotated</div>
+      <div class="data-box payments">
+        <span class="type-name">PaymentResult</span>
+        <div class="field"><span class="field-name">success</span><span class="field-val green">true</span></div>
+        <div class="field"><span class="field-name">transactionId</span><span class="field-val">"${tx.id}"  ← Hop 1 (original input)</span></div>
+        <div class="field"><span class="field-name">status</span><span class="field-val">"COMPLETED"  ← hardcoded: reached Step 3</span></div>
+        <div class="field"><span class="field-name">riskLevel</span><span class="field-val ${tx.riskColor}">"${tx.risk}"  ← Hop 3 (Compliance)</span></div>
+        <div class="field"><span class="field-name">explanation</span><span class="field-val">"${tx.explanation.substring(0,35)}…"  ← Hop 3 (Compliance)</span></div>
+        <div class="field"><span class="field-name">confirmationNumber</span><span class="field-val green">"${tx.conf || 'CONF-' + tx.id + '-...'}"  ← Hop 4</span></div>
+        <div class="field"><span class="field-name">error</span><span class="field-val muted">null  ← no exceptions</span></div>
+      </div>
+    </div>
+
+    <div class="insight green">
+      Two fields — <strong>riskLevel</strong> and <strong>explanation</strong> — originated on the
+      <em>Compliance team's</em> worker and traveled back across the Nexus boundary to end up in the
+      Payments team's result. That's the cross-team data flow in one place.
+    </div>`;
+
+  switch(hopNum) {
+    case 1: return hop1;
+    case 2: return hop2;
+    case 3: return hop3;
+    case 4: return hop4;
+    case 5: return hop5;
+  }
+}
+
+// ── Reverse lookup content ────────────────────────────────────────
+function rlContent(t) {
+  const tx = TXN[t];
+  if (!tx.approved) {
+    return `
+      <div class="p-section">
+        <div class="p-section-title">PaymentResult — DECLINED_COMPLIANCE path</div>
+        <table class="rl-table">
+          <tr><th>Field</th><th>Value</th><th>Source</th></tr>
+          <tr><td class="field-col">success</td><td class="val-col" style="color:var(--high)">false</td><td class="src-col">Workflow logic</td></tr>
+          <tr><td class="field-col">transactionId</td><td class="val-col">"${tx.id}"</td><td class="src-col"><span class="hop-ref payments" onclick="switchTab('hop');selectHop(1)">Hop 1</span> original input</td></tr>
+          <tr><td class="field-col">status</td><td class="val-col" style="color:var(--high)">"DECLINED_COMPLIANCE"</td><td class="src-col">Workflow logic</td></tr>
+          <tr><td class="field-col">riskLevel</td><td class="val-col" style="color:var(--high)">"HIGH"</td><td class="src-col"><span class="hop-ref compliance" onclick="switchTab('hop');selectHop(3)">Hop 3</span> compliance.getRiskLevel()</td></tr>
+          <tr><td class="field-col">explanation</td><td class="val-col">"${tx.explanation.substring(0,30)}…"</td><td class="src-col"><span class="hop-ref compliance" onclick="switchTab('hop');selectHop(3)">Hop 3</span> compliance.getExplanation()</td></tr>
+          <tr><td class="field-col">confirmationNumber</td><td class="val-col" style="color:var(--muted)">null</td><td class="src-col">Hop 4 never ran</td></tr>
+          <tr><td class="field-col">error</td><td class="val-col">"Declined: ${tx.explanation.substring(0,25)}…"</td><td class="src-col">Workflow logic</td></tr>
+        </table>
+      </div>
+      <div class="insight red">
+        <strong>Notice:</strong> <code>riskLevel</code> and <code>explanation</code> are still populated even on the declined path —
+        they crossed the Nexus boundary from Compliance at Hop 3 before the workflow decided to stop.
+        That's your audit trail: you know exactly why this was blocked.
+      </div>`;
+  }
+  return `
+    <div class="p-section">
+      <div class="p-section-title">Where does each PaymentResult field come from?</div>
+      <table class="rl-table">
+        <tr><th>Field</th><th>Value</th><th>Source</th></tr>
+        <tr>
+          <td class="field-col">success</td>
+          <td class="val-col" style="color:var(--low)">true</td>
+          <td class="src-col">Reached Step 3 without exception</td>
+        </tr>
+        <tr>
+          <td class="field-col">transactionId</td>
+          <td class="val-col">"${tx.id}"</td>
+          <td class="src-col"><span class="hop-ref payments" onclick="switchTab('hop');selectHop(1)">Hop 1</span> request.getTransactionId()</td>
+        </tr>
+        <tr>
+          <td class="field-col">status</td>
+          <td class="val-col" style="color:var(--low)">"COMPLETED"</td>
+          <td class="src-col">Hardcoded in success path</td>
+        </tr>
+        <tr>
+          <td class="field-col">riskLevel</td>
+          <td class="val-col" style="color:var(--${tx.riskColor === 'green' ? 'low' : tx.riskColor === 'orange' ? 'medium' : 'high'})">"${tx.risk}"</td>
+          <td class="src-col"><span class="hop-ref compliance" onclick="switchTab('hop');selectHop(3)">Hop 3</span> compliance.getRiskLevel() — <em>from Compliance team</em></td>
+        </tr>
+        <tr>
+          <td class="field-col">explanation</td>
+          <td class="val-col">"${tx.explanation.substring(0,30)}…"</td>
+          <td class="src-col"><span class="hop-ref compliance" onclick="switchTab('hop');selectHop(3)">Hop 3</span> compliance.getExplanation() — <em>from Compliance team</em></td>
+        </tr>
+        <tr>
+          <td class="field-col">confirmationNumber</td>
+          <td class="val-col" style="color:var(--low)">"${tx.conf}"</td>
+          <td class="src-col"><span class="hop-ref payments" onclick="switchTab('hop');selectHop(4)">Hop 4</span> paymentActivity.executePayment() return value</td>
+        </tr>
+        <tr>
+          <td class="field-col">error</td>
+          <td class="val-col" style="color:var(--muted)">null</td>
+          <td class="src-col">No exceptions thrown</td>
+        </tr>
+      </table>
+    </div>
+    <div class="insight">
+      <strong>Two fields crossed the Nexus boundary.</strong>
+      <code>riskLevel</code> and <code>explanation</code> were produced by OpenAI running on the
+      <em>Compliance team's</em> worker, travelled back via Nexus, and landed in a <code>PaymentResult</code>
+      on the <em>Payments team's</em> side. That's cross-team data flow — fully auditable in both teams' event histories.
+    </div>`;
+}
+
+// ── Rendering ─────────────────────────────────────────────────────
+function selectTxn(key, btn) {
+  document.querySelectorAll('.txn-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentTxn = key;
+  const tx = TXN[key];
+  document.getElementById('txnDesc').innerHTML = `<strong>${key === 'A' ? 'TXN-A' : key === 'B' ? 'TXN-B' : 'TXN-C'}</strong> — ${tx.label.split('—')[1].trim()}`;
+
+  // Update card skipped state
+  const declined = !tx.approved;
+  document.getElementById('card4').classList.toggle('skipped', declined);
+  document.getElementById('card5').classList.toggle('skipped', declined);
+  document.getElementById('conn34wrap').style.opacity = declined ? '.3' : '1';
+  document.getElementById('conn45wrap').style.opacity = declined ? '.3' : '1';
+  document.getElementById('declineBranch').classList.toggle('visible', declined);
+
+  // Re-render current selection
+  if (currentHop && (currentTab === 'hop')) renderHopDetail();
+  if (currentTab === 'rl') renderRL();
+}
+
+function selectHop(num) {
+  currentHop = num;
+  // Deselect all
+  for (let i = 1; i <= 5; i++) {
+    document.getElementById('card' + i).classList.remove('selected');
+  }
+  document.getElementById('card' + num).classList.add('selected');
+  if (currentTab !== 'hop') switchTab('hop');
+  else renderHopDetail();
+}
+
+function renderHopDetail() {
+  const panel = document.getElementById('detailPanel');
+  if (!currentHop) {
+    panel.innerHTML = document.getElementById('placeholder').outerHTML;
+    return;
+  }
+  panel.innerHTML = `
+    <div class="p-section" style="gap:10px">
+      ${hopContent(currentHop, currentTxn)}
+    </div>`;
+}
+
+function renderRL() {
+  const panel = document.getElementById('detailPanel');
+  panel.innerHTML = rlContent(currentTxn);
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tabHop').classList.toggle('active', tab === 'hop');
+  document.getElementById('tabRL').classList.toggle('active', tab === 'rl');
+  if (tab === 'hop') renderHopDetail();
+  else renderRL();
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+selectTxn('B', document.querySelector('[data-t="B"]'));
+selectHop(1);
+</script>
+</body>
+</html>

@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exercise 1301 — Temporal Nexus Intro</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --payments-color: #58a6ff;
+    --payments-bg: rgba(88, 166, 255, 0.08);
+    --payments-border: rgba(88, 166, 255, 0.3);
+    --compliance-color: #3fb950;
+    --compliance-bg: rgba(63, 185, 80, 0.08);
+    --compliance-border: rgba(63, 185, 80, 0.3);
+    --nexus-color: #f0883e;
+    --nexus-glow: rgba(240, 136, 62, 0.4);
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --token-color: #f0883e;
+    --low-risk: #3fb950;
+    --medium-risk: #f0883e;
+    --high-risk: #f85149;
+    --panel-bg: #1c2128;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ─────────────────────────────────────────── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  header h1 { font-size: 16px; font-weight: 600; }
+  header .badge {
+    background: rgba(240,136,62,0.15);
+    color: var(--nexus-color);
+    border: 1px solid rgba(240,136,62,0.3);
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  header .subtitle { color: var(--text-muted); font-size: 13px; margin-left: auto; }
+
+  /* ── Controls row ────────────────────────────────────── */
+  .controls {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .controls label { color: var(--text-muted); font-size: 13px; font-weight: 500; }
+
+  .txn-selector { display: flex; gap: 8px; }
+  .txn-btn {
+    padding: 6px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  .txn-btn:hover { border-color: var(--text-muted); color: var(--text); }
+  .txn-btn.active { border-color: var(--nexus-color); color: var(--nexus-color); background: rgba(240,136,62,0.1); }
+
+  .mode-toggle {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+  }
+  .mode-label { font-size: 13px; font-weight: 500; }
+  .mode-label.rest { color: var(--high-risk); }
+  .mode-label.nexus { color: var(--compliance-color); }
+  .toggle-switch {
+    width: 40px; height: 20px;
+    background: var(--high-risk);
+    border-radius: 10px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+  }
+  .toggle-switch.on { background: var(--compliance-color); }
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 16px; height: 16px;
+    background: white;
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: transform 0.2s;
+  }
+  .toggle-switch.on::after { transform: translateX(20px); }
+
+  /* ── Step description bar ────────────────────────────── */
+  .step-bar {
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 52px;
+  }
+  .step-indicator {
+    background: var(--nexus-color);
+    color: black;
+    font-weight: 700;
+    font-size: 12px;
+    border-radius: 50%;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-text { flex: 1; }
+  .step-text strong { display: block; font-size: 14px; }
+  .step-text .tip {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .step-nav { display: flex; gap: 8px; }
+  .nav-btn {
+    padding: 6px 18px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .nav-btn.primary {
+    background: var(--nexus-color);
+    border-color: var(--nexus-color);
+    color: black;
+    font-weight: 600;
+  }
+  .nav-btn.primary:hover:not(:disabled) { opacity: 0.85; }
+  .nav-btn:hover:not(:disabled):not(.primary) { border-color: var(--text-muted); }
+
+  /* ── Main content ────────────────────────────────────── */
+  .main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── Canvas ──────────────────────────────────────────── */
+  .canvas {
+    flex: 1;
+    position: relative;
+    padding: 32px 24px;
+    display: flex;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  /* Team zones */
+  .team-zone {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid;
+    position: relative;
+  }
+  .team-zone.payments {
+    background: var(--payments-bg);
+    border-color: var(--payments-border);
+    margin-right: 0;
+  }
+  .team-zone.compliance {
+    background: var(--compliance-bg);
+    border-color: var(--compliance-border);
+    margin-left: 0;
+  }
+  .team-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .team-label.payments { color: var(--payments-color); }
+  .team-label.compliance { color: var(--compliance-color); }
+
+  /* Nexus boundary */
+  .nexus-boundary {
+    width: 64px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    position: relative;
+    cursor: pointer;
+    z-index: 10;
+  }
+  .nexus-line {
+    width: 3px;
+    height: 100%;
+    position: absolute;
+    background: linear-gradient(to bottom,
+      transparent 0%, var(--nexus-color) 20%, var(--nexus-color) 80%, transparent 100%);
+    box-shadow: 0 0 12px var(--nexus-glow);
+  }
+  .nexus-label-box {
+    background: var(--surface);
+    border: 1.5px solid var(--nexus-color);
+    border-radius: 8px;
+    padding: 6px 10px;
+    text-align: center;
+    position: relative;
+    z-index: 2;
+    box-shadow: 0 0 16px var(--nexus-glow);
+    transition: box-shadow 0.3s;
+  }
+  .nexus-label-box:hover { box-shadow: 0 0 28px var(--nexus-glow); }
+  .nexus-label-box .nx-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--nexus-color);
+    letter-spacing: 0.06em;
+  }
+  .nexus-label-box .nx-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* Component boxes */
+  .component {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .component:hover { border-color: var(--text-muted); transform: translateY(-1px); }
+  .component.active-step {
+    border-color: var(--nexus-color);
+    box-shadow: 0 0 0 2px rgba(240,136,62,0.3);
+  }
+  .component.completed-step {
+    border-color: var(--compliance-color);
+    background: rgba(63,185,80,0.06);
+  }
+  .component-title {
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .component-type {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+  .component-icon { font-size: 16px; }
+
+  /* Token (animated transaction blob) */
+  .token {
+    position: absolute;
+    width: 28px; height: 28px;
+    background: var(--token-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: black;
+    box-shadow: 0 0 16px var(--nexus-glow);
+    z-index: 20;
+    transition: left 0.6s cubic-bezier(0.4,0,0.2,1), top 0.6s cubic-bezier(0.4,0,0.2,1), opacity 0.3s;
+    pointer-events: none;
+  }
+  .token.hidden { opacity: 0; }
+  .token.beam {
+    background: white;
+    box-shadow: 0 0 24px white, 0 0 48px var(--nexus-color);
+    animation: beam-pulse 0.6s ease-in-out;
+  }
+
+  @keyframes beam-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.8); }
+    100% { transform: scale(1); }
+  }
+
+  /* REST failure flash */
+  .rest-flash {
+    position: absolute;
+    inset: 0;
+    background: rgba(248,81,73,0.25);
+    border-radius: 12px;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .rest-flash.visible { opacity: 1; }
+  .rest-flash .msg {
+    background: var(--high-risk);
+    color: white;
+    font-weight: 700;
+    font-size: 16px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  /* AI spinner */
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(240,136,62,0.3);
+    border-top-color: var(--nexus-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Result banner */
+  .result-banner {
+    margin-top: auto;
+    padding: 14px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    display: none;
+  }
+  .result-banner.show { display: block; }
+  .result-banner.approved { background: rgba(63,185,80,0.15); border: 1px solid var(--compliance-color); color: var(--compliance-color); }
+  .result-banner.declined { background: rgba(248,81,73,0.15); border: 1px solid var(--high-risk); color: var(--high-risk); }
+  .result-banner .risk-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-left: 8px;
+    font-weight: 700;
+  }
+  .risk-badge.LOW { background: rgba(63,185,80,0.2); color: var(--low-risk); }
+  .risk-badge.MEDIUM { background: rgba(240,136,62,0.2); color: var(--medium-risk); }
+  .risk-badge.HIGH { background: rgba(248,81,73,0.2); color: var(--high-risk); }
+
+  /* ── Side panel ──────────────────────────────────────── */
+  .side-panel {
+    width: 300px;
+    border-left: 1px solid var(--border);
+    background: var(--panel-bg);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-header h3 { font-size: 14px; font-weight: 600; }
+  .panel-header .panel-type {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+  .panel-body { padding: 16px; flex: 1; }
+  .panel-body p { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px; }
+  .panel-body p:last-child { margin-bottom: 0; }
+  .panel-body .highlight {
+    background: rgba(240,136,62,0.1);
+    border-left: 3px solid var(--nexus-color);
+    padding: 8px 12px;
+    border-radius: 0 4px 4px 0;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+  .panel-body code {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 12px;
+    color: var(--payments-color);
+  }
+  .panel-placeholder {
+    padding: 24px 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .panel-placeholder .icon { font-size: 32px; margin-bottom: 12px; }
+
+  /* Compliance result display in panel */
+  .compliance-result {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+  }
+  .compliance-result .cr-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .compliance-result .cr-value {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .cr-approved { color: var(--compliance-color); }
+  .cr-declined { color: var(--high-risk); }
+
+  /* Step progress dots */
+  .step-dots {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+  }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.3s;
+  }
+  .dot.done { background: var(--compliance-color); }
+  .dot.current { background: var(--nexus-color); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">NEXUS</div>
+  <h1>Exercise 1301 — Temporal Nexus Intro</h1>
+  <span class="subtitle">Payments Team ↔ Compliance Team via Durable Nexus Call</span>
+</header>
+
+<div class="controls">
+  <label>Transaction:</label>
+  <div class="txn-selector">
+    <button class="txn-btn active" data-txn="A" onclick="selectTxn('A', this)">
+      TXN-A · $250 · US→US
+    </button>
+    <button class="txn-btn" data-txn="B" onclick="selectTxn('B', this)">
+      TXN-B · $12,000 · US→UK
+    </button>
+    <button class="txn-btn" data-txn="C" onclick="selectTxn('C', this)">
+      TXN-C · $75,000 · US→🚫
+    </button>
+  </div>
+
+  <div class="mode-toggle" onclick="toggleMode()">
+    <span class="mode-label rest">REST</span>
+    <div class="toggle-switch on" id="modeSwitch"></div>
+    <span class="mode-label nexus">Nexus</span>
+  </div>
+</div>
+
+<div class="step-bar">
+  <div class="step-indicator" id="stepIndicator">0</div>
+  <div class="step-text">
+    <strong id="stepTitle">Ready to start</strong>
+    <div class="tip" id="stepTip">Select a transaction and click "Next Step" to begin</div>
+  </div>
+  <div class="step-dots" id="stepDots"></div>
+  <div class="step-nav">
+    <button class="nav-btn" id="btnBack" onclick="stepBack()" disabled>← Back</button>
+    <button class="nav-btn primary" id="btnNext" onclick="stepNext()">Next Step →</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="canvas" id="canvas">
+
+    <!-- Payments Team Zone -->
+    <div class="team-zone payments" id="zonePayments">
+      <div class="team-label payments">Payments Team</div>
+
+      <div class="component" id="compStarter" onclick="showPanel('starter')">
+        <div class="component-title"><span class="component-icon">🚀</span> PaymentStarter</div>
+        <div class="component-type">Client — starts workflows</div>
+      </div>
+
+      <div class="component" id="compWorkflow" onclick="showPanel('workflow')">
+        <div class="component-title"><span class="component-icon">⚙️</span> PaymentProcessingWorkflow</div>
+        <div class="component-type">Workflow — orchestrates steps durably</div>
+      </div>
+
+      <div class="component" id="compValidate" onclick="showPanel('validate')">
+        <div class="component-title"><span class="component-icon">✅</span> validatePayment</div>
+        <div class="component-type">Activity — checks amount &amp; accounts</div>
+      </div>
+
+      <div class="component" id="compProcess" onclick="showPanel('process')">
+        <div class="component-title"><span class="component-icon">💳</span> executePayment</div>
+        <div class="component-type">Activity — calls payment gateway</div>
+      </div>
+
+      <div class="result-banner" id="resultBanner"></div>
+    </div>
+
+    <!-- Nexus Boundary -->
+    <div class="nexus-boundary" onclick="showPanel('nexus')">
+      <div class="nexus-line"></div>
+      <div class="nexus-label-box" id="nexusBox">
+        <div class="nx-title">NEXUS</div>
+        <div class="nx-sub">durable RPC</div>
+      </div>
+    </div>
+
+    <!-- Compliance Team Zone -->
+    <div class="team-zone compliance" id="zoneCompliance">
+      <div class="team-label compliance">Compliance Team</div>
+
+      <div class="component" id="compNexusImpl" onclick="showPanel('nexusImpl')">
+        <div class="component-title"><span class="component-icon">🔌</span> ComplianceNexusServiceImpl</div>
+        <div class="component-type">Nexus handler — receives cross-team calls</div>
+      </div>
+
+      <div class="component" id="compAgent" onclick="showPanel('agent')">
+        <div class="component-title"><span class="component-icon">🤖</span> ComplianceAgent (LLM)</div>
+        <div class="component-type">Activity — OpenAI risk assessment</div>
+      </div>
+
+      <div id="complianceResultBox" style="display:none">
+        <div class="compliance-result" id="complianceResultContent"></div>
+      </div>
+    </div>
+
+    <!-- REST failure flash overlay -->
+    <div class="rest-flash" id="restFlash">
+      <div class="msg">❌ CONNECTION FAILED<br><span style="font-size:12px;font-weight:400">No retries. Transaction lost.</span></div>
+    </div>
+
+    <!-- Animated token -->
+    <div class="token hidden" id="token">●</div>
+  </div>
+
+  <!-- Side panel -->
+  <div class="side-panel" id="sidePanel">
+    <div class="panel-placeholder">
+      <div class="icon">👆</div>
+      <strong>Click any component</strong> to learn what it does<br><br>
+      Or use <em>Next Step</em> to walk through the flow step by step.
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────
+const TXN = {
+  A: { id: 'TXN-A', amount: '$250', route: 'US → US', risk: 'LOW', approved: true,
+       explanation: 'Routine domestic transfer, no regulatory concerns.' },
+  B: { id: 'TXN-B', amount: '$12,000', route: 'US → UK', risk: 'MEDIUM', approved: true,
+       explanation: 'International transfer above $10K threshold; approved with AML note.' },
+  C: { id: 'TXN-C', amount: '$75,000', route: 'US → North Korea', risk: 'HIGH', approved: false,
+       explanation: 'Destination country is OFAC-sanctioned. Transaction blocked.' },
+};
+
+let currentTxn = 'A';
+let currentStep = 0;
+let isNexusMode = true;
+const MAX_STEPS = 6;
+
+// Step definitions
+const steps = [
+  { title: 'Ready', tip: 'Select a transaction and click "Next Step" to begin.' },
+  { title: 'PaymentStarter fires', tip: 'The client starts a new PaymentProcessingWorkflow with a business ID like "payment-TXN-A". Temporal persists this immediately.' },
+  { title: 'Step 1 — Validate payment', tip: 'Workflow calls validatePayment activity. If the Payments worker crashes here, Temporal replays from the last checkpoint.' },
+  { title: 'Step 2 — Nexus call to Compliance team', tip: 'The workflow calls checkCompliance() via Nexus. Temporal routes this cross-team call durably — no fragile HTTP.' },
+  { title: 'ComplianceAgent assesses risk', tip: 'The ComplianceNexusServiceImpl sync handler calls OpenAI. If this fails, Temporal retries — no manual retry code needed.' },
+  { title: 'Compliance result returned', tip: 'The result crosses back over the Nexus boundary into the Payments workflow. For HIGH risk, payment is declined.' },
+  { title: 'Step 3 — Execute payment (or decline)', tip: 'Approved transactions call executePayment activity. Declined transactions stop here.' },
+];
+
+// ── Transaction selector ─────────────────────────────────────────
+function selectTxn(key, btn) {
+  document.querySelectorAll('.txn-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentTxn = key;
+  reset();
+}
+
+// ── Mode toggle ──────────────────────────────────────────────────
+function toggleMode() {
+  isNexusMode = !isNexusMode;
+  document.getElementById('modeSwitch').classList.toggle('on', isNexusMode);
+  reset();
+}
+
+// ── Navigation ───────────────────────────────────────────────────
+function stepNext() {
+  if (currentStep < MAX_STEPS) {
+    currentStep++;
+    renderStep();
+  }
+}
+
+function stepBack() {
+  if (currentStep > 0) {
+    currentStep--;
+    renderStep();
+  }
+}
+
+function reset() {
+  currentStep = 0;
+  renderStep();
+}
+
+// ── Render step ──────────────────────────────────────────────────
+function renderStep() {
+  const txn = TXN[currentTxn];
+  const step = steps[Math.min(currentStep, steps.length - 1)];
+
+  // Update nav buttons
+  document.getElementById('btnBack').disabled = currentStep === 0;
+  document.getElementById('btnNext').disabled = currentStep === MAX_STEPS;
+
+  // Update step indicator
+  document.getElementById('stepIndicator').textContent = currentStep;
+  document.getElementById('stepTitle').textContent = currentStep === 0 ? 'Ready to start' : step.title;
+  document.getElementById('stepTip').textContent = step.tip || '';
+
+  // Update dots
+  const dots = document.getElementById('stepDots');
+  dots.innerHTML = '';
+  for (let i = 1; i <= MAX_STEPS; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i < currentStep ? ' done' : i === currentStep ? ' current' : '');
+    dots.appendChild(d);
+  }
+
+  // Clear all highlights
+  document.querySelectorAll('.component').forEach(c => {
+    c.classList.remove('active-step', 'completed-step');
+  });
+
+  // Hide result banner & compliance result
+  document.getElementById('resultBanner').classList.remove('show', 'approved', 'declined');
+  document.getElementById('complianceResultBox').style.display = 'none';
+
+  // Clear REST flash
+  document.getElementById('restFlash').classList.remove('visible');
+
+  // Hide token
+  const token = document.getElementById('token');
+  token.classList.add('hidden');
+  token.classList.remove('beam');
+
+  // Apply step-specific logic
+  switch (currentStep) {
+    case 0:
+      break;
+
+    case 1: // PaymentStarter fires
+      highlight('compStarter', 'active');
+      placeToken('compStarter');
+      break;
+
+    case 2: // Validate payment
+      highlight('compStarter', 'done');
+      highlight('compWorkflow', 'done');
+      highlight('compValidate', 'active');
+      placeToken('compValidate');
+      break;
+
+    case 3: // Nexus call
+      highlight('compStarter', 'done');
+      highlight('compWorkflow', 'done');
+      highlight('compValidate', 'done');
+      if (!isNexusMode) {
+        // REST mode: show failure flash
+        setTimeout(() => {
+          document.getElementById('restFlash').classList.add('visible');
+          setTimeout(() => document.getElementById('restFlash').classList.remove('visible'), 2500);
+        }, 400);
+        placeToken('nexusArea');
+      } else {
+        highlight('compNexusImpl', 'active');
+        placeTokenAtNexus();
+      }
+      break;
+
+    case 4: // ComplianceAgent thinking
+      if (isNexusMode) {
+        highlight('compStarter', 'done');
+        highlight('compWorkflow', 'done');
+        highlight('compValidate', 'done');
+        highlight('compNexusImpl', 'done');
+        highlight('compAgent', 'active');
+        placeToken('compAgent');
+        // Show spinner in agent
+        document.getElementById('compAgent').querySelector('.component-type').innerHTML =
+          '<span class="spinner"></span> AI assessing risk... (' + txn.id + ', ' + txn.amount + ', ' + txn.route + ')';
+      }
+      break;
+
+    case 5: // Result returned
+      if (isNexusMode) {
+        highlight('compStarter', 'done');
+        highlight('compWorkflow', 'done');
+        highlight('compValidate', 'done');
+        highlight('compNexusImpl', 'done');
+        highlight('compAgent', 'done');
+        // Reset agent type text
+        document.getElementById('compAgent').querySelector('.component-type').textContent =
+          'Activity — OpenAI risk assessment';
+        // Show compliance result
+        showComplianceResult(txn);
+        placeToken('compWorkflow');
+        token.classList.add('beam');
+      }
+      break;
+
+    case 6: // Execute or decline
+      document.getElementById('compAgent').querySelector('.component-type').textContent =
+        'Activity — OpenAI risk assessment';
+      if (isNexusMode) {
+        highlight('compStarter', 'done');
+        highlight('compWorkflow', 'done');
+        highlight('compValidate', 'done');
+        highlight('compNexusImpl', 'done');
+        highlight('compAgent', 'done');
+        showComplianceResult(txn);
+        if (txn.approved) {
+          highlight('compProcess', 'active');
+          placeToken('compProcess');
+          showResultBanner(txn, true);
+        } else {
+          showResultBanner(txn, false);
+          token.classList.add('hidden');
+        }
+      }
+      break;
+  }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────
+function highlight(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('active-step', 'completed-step');
+  if (state === 'active') el.classList.add('active-step');
+  if (state === 'done') el.classList.add('completed-step');
+}
+
+function placeToken(componentId) {
+  const token = document.getElementById('token');
+  const canvas = document.getElementById('canvas');
+  const target = document.getElementById(componentId);
+  if (!target) { token.classList.add('hidden'); return; }
+  const cr = canvas.getBoundingClientRect();
+  const tr = target.getBoundingClientRect();
+  const x = tr.left - cr.left + tr.width / 2 - 14;
+  const y = tr.top - cr.top + tr.height / 2 - 14;
+  token.style.left = x + 'px';
+  token.style.top = y + 'px';
+  token.classList.remove('hidden');
+  token.classList.remove('beam');
+}
+
+function placeTokenAtNexus() {
+  const token = document.getElementById('token');
+  const canvas = document.getElementById('canvas');
+  const nexus = document.getElementById('nexusBox');
+  const cr = canvas.getBoundingClientRect();
+  const nr = nexus.getBoundingClientRect();
+  token.style.left = (nr.left - cr.left + nr.width / 2 - 14) + 'px';
+  token.style.top = (nr.top - cr.top + nr.height / 2 - 14) + 'px';
+  token.classList.remove('hidden');
+  token.classList.add('beam');
+}
+
+function showComplianceResult(txn) {
+  const box = document.getElementById('complianceResultBox');
+  const content = document.getElementById('complianceResultContent');
+  box.style.display = 'block';
+  const approvedClass = txn.approved ? 'cr-approved' : 'cr-declined';
+  const approvedText = txn.approved ? '✅ APPROVED' : '🚫 DECLINED';
+  content.innerHTML = `
+    <div class="cr-label">Compliance Result</div>
+    <div class="cr-value ${approvedClass}">${approvedText}
+      <span class="risk-badge ${txn.risk}">${txn.risk} RISK</span>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.5">${txn.explanation}</div>
+  `;
+}
+
+function showResultBanner(txn, approved) {
+  const banner = document.getElementById('resultBanner');
+  banner.classList.add('show');
+  if (approved) {
+    banner.classList.add('approved');
+    banner.innerHTML = `✅ Payment COMPLETED <span class="risk-badge ${txn.risk}">${txn.risk} RISK</span>`;
+  } else {
+    banner.classList.add('declined');
+    banner.innerHTML = `🚫 Payment DECLINED by Compliance <span class="risk-badge ${txn.risk}">${txn.risk} RISK</span>`;
+  }
+}
+
+// ── Side panel content ────────────────────────────────────────────
+const panelContent = {
+  starter: {
+    title: 'PaymentStarter',
+    type: 'Client code — not a workflow',
+    body: `
+      <p>The <strong>PaymentStarter</strong> is plain Java code that connects to Temporal and kicks off a workflow execution.</p>
+      <div class="highlight">Business ID pattern: use <code>"payment-" + txn.getTransactionId()</code> instead of a random UUID. This makes workflows findable in the UI by transaction ID.</div>
+      <p>In this exercise, transactions run sequentially. In <strong>Exercise 1300</strong>, you'll start 5 workflows in parallel using <code>WorkflowClient.execute()</code> + <code>CompletableFuture</code>.</p>
+    `
+  },
+  workflow: {
+    title: 'PaymentProcessingWorkflow',
+    type: 'Temporal Workflow — durable orchestrator',
+    body: `
+      <p>The workflow is the <strong>durable orchestrator</strong>. It coordinates all steps without doing any of the actual work.</p>
+      <div class="highlight">If the worker crashes mid-execution, Temporal replays the workflow from the event history. The workflow picks up exactly where it left off.</div>
+      <p>The workflow code must be <strong>deterministic</strong> — no <code>System.currentTimeMillis()</code>, no <code>Math.random()</code>. Those go in activities.</p>
+      <p>Use <code>Workflow.getLogger()</code>, not <code>System.out.println()</code> — workflows replay, so println fires on every replay.</p>
+    `
+  },
+  validate: {
+    title: 'validatePayment',
+    type: 'Temporal Activity — non-deterministic work',
+    body: `
+      <p>Activities are where <strong>non-deterministic work</strong> happens: database calls, API calls, anything that can fail for external reasons.</p>
+      <div class="highlight">Temporal retries activities automatically with the RetryOptions you configure. No manual retry loops needed.</div>
+      <p>The activity just delegates to <code>PaymentGateway.validatePayment()</code>. Business logic lives in the gateway — the activity is a thin wrapper.</p>
+    `
+  },
+  process: {
+    title: 'executePayment',
+    type: 'Temporal Activity — calls payment gateway',
+    body: `
+      <p>Calls the payment gateway to execute the transaction. The gateway has a <strong>10% failure rate</strong> to simulate real-world instability.</p>
+      <div class="highlight">Without Temporal: you'd write retry loops. With Temporal: configure RetryOptions once, never write retry code.</div>
+      <p>Only reached if compliance returned <code>approved=true</code>. For TXN-C (HIGH risk), this step is skipped entirely.</p>
+    `
+  },
+  nexus: {
+    title: 'Nexus Boundary',
+    type: 'Durable cross-team RPC — the new concept',
+    body: `
+      <div class="highlight">Nexus replaces fragile REST calls between teams with <strong>durable, type-safe, retryable RPC</strong>.</div>
+      <p>Without Nexus: the Payments team makes an HTTP call to the Compliance service. If Compliance is down — no retry, no recovery, transaction lost.</p>
+      <p>With Nexus: Temporal handles the cross-team routing, retries, and audit trail. The call appears in the Temporal UI as a linked Nexus operation.</p>
+      <p>The workflow sees it as a local method call: <code>complianceService.checkCompliance(request)</code></p>
+      <p>In <strong>Exercise 1300</strong>, you'll also implement async Nexus operations that start full workflows on the Compliance side.</p>
+    `
+  },
+  nexusImpl: {
+    title: 'ComplianceNexusServiceImpl',
+    type: 'Nexus service handler — the key new file',
+    body: `
+      <p>This is the <strong>most important file</strong> to implement in this exercise.</p>
+      <div class="highlight">@ServiceImpl(service = ComplianceNexusService.class) tells Temporal this class handles Nexus requests for that interface.</div>
+      <p>The <code>@OperationImpl</code> method returns a <code>WorkflowClientOperationHandlers.sync(...)</code> — meaning: run this inline and return the result immediately.</p>
+      <p>Compare with the interface: the handler method name must exactly match the <code>@Operation</code> method in <code>ComplianceNexusService</code>.</p>
+      <p>In <strong>Exercise 1300</strong>, you'll also write an async handler using <code>WorkflowClientOperationHandlers.fromWorkflowMethod()</code>.</p>
+    `
+  },
+  agent: {
+    title: 'ComplianceAgent (LLM)',
+    type: 'Called from the Nexus sync handler',
+    body: `
+      <p>The <strong>ComplianceAgent</strong> calls OpenAI GPT-4o-mini with transaction details and parses a structured response.</p>
+      <div class="highlight">This is where the AI runs — inside the Nexus sync handler, on the Compliance team's worker. The Payments team never sees this code.</div>
+      <p>Output format: <code>APPROVED: true/false</code> | <code>RISK_LEVEL: LOW/MEDIUM/HIGH</code> | <code>EXPLANATION: ...</code></p>
+      <p>If the OpenAI call fails, the Nexus handler throws — and Temporal retries the whole Nexus operation from the Payments side.</p>
+    `
+  },
+};
+
+function showPanel(key) {
+  const content = panelContent[key];
+  if (!content) return;
+  document.getElementById('sidePanel').innerHTML = `
+    <div class="panel-header">
+      <h3>${content.title}</h3>
+      <div class="panel-type">${content.type}</div>
+    </div>
+    <div class="panel-body">${content.body}</div>
+  `;
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+renderStep();
+</script>
+</body>
+</html>

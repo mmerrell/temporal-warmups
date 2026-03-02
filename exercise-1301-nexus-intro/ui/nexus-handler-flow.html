@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexus Handler Flow — Exercise 1301</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --payments-color: #58a6ff;
+    --payments-bg: rgba(88,166,255,0.07);
+    --payments-border: rgba(88,166,255,0.25);
+    --compliance-color: #3fb950;
+    --compliance-bg: rgba(63,185,80,0.07);
+    --compliance-border: rgba(63,185,80,0.25);
+    --nexus-color: #f0883e;
+    --nexus-glow: rgba(240,136,62,0.35);
+    --lambda-color: #bc8cff;
+    --lambda-bg: rgba(188,140,255,0.07);
+    --lambda-border: rgba(188,140,255,0.25);
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --panel-bg: #1c2128;
+    --code-bg: #0d1117;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  header h1 { font-size: 22px; font-weight: 700; color: var(--text); }
+  header p { color: var(--muted); font-size: 14px; margin-top: 6px; }
+
+  /* ── Step progress bar ── */
+  .progress-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 28px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .step-pip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: opacity .2s;
+  }
+  .step-pip:hover { opacity: .8; }
+  .pip-dot {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: var(--muted);
+    transition: all .3s;
+    position: relative; z-index: 1;
+  }
+  .pip-dot.active {
+    border-color: var(--nexus-color);
+    background: rgba(240,136,62,0.15);
+    color: var(--nexus-color);
+    box-shadow: 0 0 12px var(--nexus-glow);
+  }
+  .pip-dot.done {
+    border-color: var(--compliance-color);
+    background: rgba(63,185,80,0.15);
+    color: var(--compliance-color);
+  }
+  .pip-label {
+    font-size: 10px; color: var(--muted); text-align: center;
+    max-width: 72px; line-height: 1.3;
+  }
+  .pip-connector {
+    width: 36px; height: 2px;
+    background: var(--border);
+    margin-bottom: 16px;
+    transition: background .3s;
+  }
+  .pip-connector.done { background: var(--compliance-color); }
+
+  /* ── Main layout ── */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* ── Flow canvas ── */
+  .canvas {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 24px;
+    position: relative;
+    min-height: 520px;
+  }
+
+  .team-label {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; margin-bottom: 14px; padding: 4px 10px;
+    border-radius: 4px; display: inline-block;
+  }
+  .team-label.payments { color: var(--payments-color); background: var(--payments-bg); }
+  .team-label.compliance { color: var(--compliance-color); background: var(--compliance-bg); }
+
+  /* columns */
+  .flow-cols {
+    display: grid;
+    grid-template-columns: 1fr 80px 1fr;
+    gap: 0;
+    align-items: start;
+  }
+
+  /* class boxes */
+  .class-box {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    cursor: pointer;
+    transition: all .25s;
+    position: relative;
+  }
+  .class-box:hover { border-color: var(--muted); background: rgba(255,255,255,0.02); }
+  .class-box.active-box { box-shadow: 0 0 0 2px var(--nexus-color); }
+  .class-box.payments-box { border-color: var(--payments-border); background: var(--payments-bg); }
+  .class-box.payments-box.active-box { box-shadow: 0 0 0 2px var(--payments-color); }
+  .class-box.compliance-box { border-color: var(--compliance-border); background: var(--compliance-bg); }
+  .class-box.compliance-box.active-box { box-shadow: 0 0 0 2px var(--compliance-color); }
+  .class-box.lambda-box { border-color: var(--lambda-border); background: var(--lambda-bg); }
+  .class-box.lambda-box.active-box { box-shadow: 0 0 0 2px var(--lambda-color); }
+
+  .box-title { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+  .box-subtitle { font-size: 11px; color: var(--muted); }
+  .box-annotation {
+    font-size: 10px; color: var(--nexus-color);
+    background: rgba(240,136,62,0.1);
+    border: 1px solid rgba(240,136,62,0.2);
+    border-radius: 3px; padding: 1px 5px;
+    display: inline-block; margin-top: 4px;
+  }
+
+  /* Nexus boundary */
+  .nexus-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 36px;
+  }
+  .nexus-line {
+    width: 2px;
+    background: linear-gradient(to bottom, transparent, var(--nexus-color), transparent);
+    flex: 1;
+    min-height: 340px;
+    position: relative;
+  }
+  .nexus-badge {
+    background: var(--surface);
+    border: 1px solid var(--nexus-color);
+    border-radius: 20px;
+    padding: 5px 10px;
+    font-size: 10px; font-weight: 700;
+    color: var(--nexus-color);
+    text-transform: uppercase; letter-spacing: .06em;
+    margin: 12px 0;
+    white-space: nowrap;
+    box-shadow: 0 0 12px var(--nexus-glow);
+  }
+
+  /* arrows that animate between steps */
+  .arrow-row {
+    display: flex; align-items: center;
+    margin: 4px 0 4px 0;
+    opacity: 0;
+    transition: opacity .4s;
+    font-size: 12px;
+    min-height: 28px;
+  }
+  .arrow-row.visible { opacity: 1; }
+  .arrow-line {
+    flex: 1; height: 2px;
+    position: relative;
+  }
+  .arrow-line::after {
+    content: '';
+    position: absolute; right: -6px; top: -4px;
+    border: 5px solid transparent;
+  }
+  .arrow-forward .arrow-line { background: var(--nexus-color); }
+  .arrow-forward .arrow-line::after { border-left-color: var(--nexus-color); }
+  .arrow-back .arrow-line { background: var(--compliance-color); }
+  .arrow-back .arrow-line::after { border-right-color: var(--compliance-color); }
+  .arrow-label {
+    font-size: 10px; font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .arrow-forward .arrow-label { color: var(--nexus-color); background: rgba(240,136,62,0.1); }
+  .arrow-back .arrow-label { color: var(--compliance-color); background: rgba(63,185,80,0.1); }
+  .arrow-left { padding-right: 6px; }
+  .arrow-right { padding-left: 6px; }
+
+  /* token packet that flies along arrows */
+  .packet {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10px; font-weight: 600;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+  .packet.req { color: var(--nexus-color); border-color: rgba(240,136,62,.4); background: rgba(240,136,62,.08); }
+  .packet.res { color: var(--compliance-color); border-color: rgba(63,185,80,.4); background: rgba(63,185,80,.08); }
+
+  /* ── Right panel ── */
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .step-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .step-card h3 {
+    font-size: 14px; font-weight: 700; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .step-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0;
+    background: var(--nexus-color); color: #000;
+  }
+  .step-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .step-desc strong { color: var(--text); }
+
+  /* data in/out */
+  .data-flow {
+    margin-top: 14px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .data-row {
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+  .data-tag {
+    font-size: 10px; font-weight: 700; letter-spacing: .05em;
+    padding: 2px 7px; border-radius: 3px; flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .data-tag.in { background: rgba(240,136,62,.15); color: var(--nexus-color); }
+  .data-tag.out { background: rgba(63,185,80,.15); color: var(--compliance-color); }
+  .data-tag.param { background: rgba(188,140,255,.15); color: var(--lambda-color); }
+
+  pre.code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 11px;
+    line-height: 1.6;
+    overflow-x: auto;
+    margin-top: 4px;
+    flex: 1;
+  }
+  pre.code-block .kw { color: #ff7b72; }
+  pre.code-block .cl { color: #79c0ff; }
+  pre.code-block .fn { color: #d2a8ff; }
+  pre.code-block .str { color: #a5d6ff; }
+  pre.code-block .cm { color: #8b949e; font-style: italic; }
+  pre.code-block .anno { color: #f0883e; }
+  pre.code-block .num { color: #79c0ff; }
+
+  /* nav buttons */
+  .nav-row {
+    display: flex; gap: 10px; justify-content: center;
+    margin-top: 4px;
+  }
+  button.nav-btn {
+    padding: 9px 22px;
+    border-radius: 7px;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text);
+    transition: all .2s;
+  }
+  button.nav-btn:hover:not(:disabled) {
+    border-color: var(--nexus-color); color: var(--nexus-color);
+    background: rgba(240,136,62,.08);
+  }
+  button.nav-btn:disabled { opacity: .35; cursor: default; }
+  button.nav-btn.primary {
+    background: rgba(240,136,62,.15);
+    border-color: var(--nexus-color); color: var(--nexus-color);
+  }
+  button.nav-btn.primary:hover:not(:disabled) {
+    background: rgba(240,136,62,.25);
+  }
+
+  /* lambda parameter table */
+  .param-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  .param-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+  .param-table td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: top; }
+  .param-table tr:last-child td { border-bottom: none; }
+  .param-name { color: var(--lambda-color); font-family: 'Courier New', monospace; font-weight: 700; }
+  .param-type { color: var(--muted); font-family: 'Courier New', monospace; font-size: 11px; }
+  .param-used { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; }
+  .param-used.yes { background: rgba(63,185,80,.15); color: var(--compliance-color); }
+  .param-used.no  { background: rgba(139,148,158,.12); color: var(--muted); }
+
+  /* highlight overlay on canvas box */
+  .highlight-pulse {
+    animation: pulse 1s ease-in-out 2;
+  }
+  @keyframes pulse {
+    0%   { opacity: 1; }
+    50%  { opacity: .5; }
+    100% { opacity: 1; }
+  }
+
+  /* flowing particle on nexus line */
+  @keyframes flowRight {
+    from { transform: translateX(-30px); opacity: 0; }
+    20%  { opacity: 1; }
+    80%  { opacity: 1; }
+    to   { transform: translateX(30px); opacity: 0; }
+  }
+  @keyframes flowLeft {
+    from { transform: translateX(30px); opacity: 0; }
+    20%  { opacity: 1; }
+    80%  { opacity: 1; }
+    to   { transform: translateX(-30px); opacity: 0; }
+  }
+  .flow-particle {
+    position: absolute;
+    font-size: 14px;
+    pointer-events: none;
+  }
+  .flow-right { animation: flowRight 1.2s ease-in-out forwards; }
+  .flow-left  { animation: flowLeft 1.2s ease-in-out forwards; }
+
+  @media (max-width: 860px) {
+    .main { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Nexus Handler Flow</h1>
+  <p>How <code>@OperationImpl</code> works — from Workflow stub call to LLM response and back</p>
+</header>
+
+<!-- Progress bar -->
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="main">
+
+  <!-- Canvas -->
+  <div class="canvas">
+    <div class="flow-cols">
+
+      <!-- LEFT: Payments Team -->
+      <div>
+        <div class="team-label payments">Payments Team</div>
+        <div id="box-workflow" class="class-box payments-box" onclick="selectBox('workflow')">
+          <div class="box-title" style="color:var(--payments-color)">PaymentProcessingWorkflowImpl</div>
+          <div class="box-subtitle">@WorkflowImpl — runs inside Temporal</div>
+        </div>
+
+        <div id="arrow-call" class="arrow-row arrow-forward" style="margin-left:16px; margin-bottom:4px;">
+          <span class="arrow-label arrow-left">.checkCompliance(req)</span>
+          <span class="arrow-line"></span>
+        </div>
+
+        <div id="box-stub" class="class-box payments-box" onclick="selectBox('stub')">
+          <div class="box-title" style="color:var(--payments-color)">Nexus Service Stub</div>
+          <div class="box-subtitle">complianceService — proxy object</div>
+          <div class="box-annotation">Workflow.newNexusServiceStub()</div>
+        </div>
+
+        <div style="height:14px"></div>
+
+        <div id="arrow-return" class="arrow-row arrow-back" style="margin-left:16px;">
+          <span class="arrow-line"></span>
+          <span class="arrow-label arrow-right">ComplianceResult</span>
+        </div>
+
+        <div style="height:8px"></div>
+
+        <div id="box-result" class="class-box payments-box" onclick="selectBox('result')">
+          <div class="box-title" style="color:var(--payments-color)">Workflow continues</div>
+          <div class="box-subtitle">result.isApproved() → step 3 or decline</div>
+        </div>
+      </div>
+
+      <!-- CENTER: Nexus boundary -->
+      <div class="nexus-col">
+        <div class="nexus-badge">Nexus</div>
+        <div class="nexus-line" id="nexusLine">
+          <div id="nexusParticle" style="display:none; top:50%; left:-8px; position:absolute;"></div>
+        </div>
+        <div class="nexus-badge" style="margin-top:0">boundary</div>
+      </div>
+
+      <!-- RIGHT: Compliance Team -->
+      <div>
+        <div class="team-label compliance">Compliance Team</div>
+        <div id="box-serviceimpl" class="class-box compliance-box" onclick="selectBox('serviceimpl')">
+          <div class="box-title" style="color:var(--compliance-color)">ComplianceNexusServiceImpl</div>
+          <div class="box-subtitle">@ServiceImpl — the handler class</div>
+          <div class="box-annotation">@ServiceImpl(service = ComplianceNexusService.class)</div>
+        </div>
+
+        <div id="arrow-dispatch" class="arrow-row" style="flex-direction:column; align-items:flex-start; gap:4px; margin-left:8px;">
+          <div style="font-size:10px; color:var(--compliance-color); padding: 2px 7px; background:rgba(63,185,80,.08); border-radius:3px;">↓ dispatches to method</div>
+        </div>
+
+        <div id="box-opimpl" class="class-box compliance-box" onclick="selectBox('opimpl')">
+          <div class="box-title" style="color:var(--compliance-color)">checkCompliance()</div>
+          <div class="box-subtitle">@OperationImpl — returns an OperationHandler</div>
+          <div class="box-annotation">method name must match @Operation</div>
+        </div>
+
+        <div id="arrow-lambda" class="arrow-row" style="flex-direction:column; align-items:flex-start; gap:4px; margin-left:8px;">
+          <div style="font-size:10px; color:var(--lambda-color); padding: 2px 7px; background:rgba(188,140,255,.08); border-radius:3px;">↓ returns handler, Temporal invokes it</div>
+        </div>
+
+        <div id="box-lambda" class="class-box lambda-box" onclick="selectBox('lambda')">
+          <div class="box-title" style="color:var(--lambda-color)">sync lambda</div>
+          <div class="box-subtitle">(context, details, client, <strong>input</strong>) → …</div>
+          <div class="box-annotation">WorkflowClientOperationHandlers.sync()</div>
+        </div>
+
+        <div id="arrow-agent" class="arrow-row" style="flex-direction:column; align-items:flex-start; gap:4px; margin-left:8px;">
+          <div style="font-size:10px; color:var(--muted); padding:2px 7px;">↓ agent.checkCompliance(input)</div>
+        </div>
+
+        <div id="box-agent" class="class-box compliance-box" onclick="selectBox('agent')">
+          <div class="box-title" style="color:var(--compliance-color)">ComplianceAgent</div>
+          <div class="box-subtitle">calls OpenAI → returns ComplianceResult</div>
+        </div>
+      </div>
+
+    </div><!-- /flow-cols -->
+  </div><!-- /canvas -->
+
+  <!-- Right panel -->
+  <div class="panel">
+    <div class="step-card" id="stepCard">
+      <!-- filled by JS -->
+    </div>
+    <div class="nav-row">
+      <button class="nav-btn" id="btnBack" onclick="go(-1)">← Back</button>
+      <button class="nav-btn primary" id="btnNext" onclick="go(1)">Next →</button>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ─── Step definitions ────────────────────────────────────────────
+const STEPS = [
+  {
+    id: 'intro',
+    label: 'Overview',
+    activeBoxes: [],
+    activeArrows: [],
+    title: 'The Big Picture',
+    content: `
+      <p class="step-desc">
+        You have two teams: <strong style="color:var(--payments-color)">Payments</strong> and
+        <strong style="color:var(--compliance-color)">Compliance</strong>.
+        They live on separate workers, separate task queues.<br><br>
+        The Payments workflow needs to ask Compliance:
+        <em>"Is this transaction safe?"</em><br><br>
+        <strong>Nexus</strong> is the durable bridge. This walkthrough shows every hop
+        your code takes — from the workflow's stub call to the LLM response and back.
+      </p>
+      <div class="data-flow">
+        <div style="margin-top:8px; padding:10px 12px; background:rgba(240,136,62,.07); border:1px solid rgba(240,136,62,.2); border-radius:6px; font-size:12px; color:var(--muted);">
+          💡 Click <strong>Next →</strong> to walk through each hop.<br>
+          Or click any class box on the diagram to jump to that step.
+        </div>
+      </div>
+    `,
+  },
+  {
+    id: 'workflow',
+    label: 'Workflow calls stub',
+    activeBoxes: ['box-workflow', 'box-stub'],
+    activeArrows: ['arrow-call'],
+    title: 'Step 1 — Workflow calls the Nexus stub',
+    content: `
+      <p class="step-desc">
+        Inside <strong>PaymentProcessingWorkflowImpl</strong>, you created a Nexus stub and
+        called it like a normal method. Temporal intercepts that call — the stub is not a real
+        object, it's a proxy.
+      </p>
+      <div class="data-flow">
+        <div class="data-row">
+          <span class="data-tag in">IN</span>
+          <pre class="code-block"><span class="cl">ComplianceRequest</span> compReq = <span class="kw">new</span> <span class="cl">ComplianceRequest</span>(
+  txn.getTransactionId(),
+  txn.getAmount(),
+  txn.getSenderCountry(),
+  txn.getReceiverCountry(),
+  txn.getDescription()
+);</pre>
+        </div>
+        <div class="data-row">
+          <span class="data-tag out">CALL</span>
+          <pre class="code-block"><span class="cl">ComplianceResult</span> result =
+  complianceService
+    .<span class="fn">checkCompliance</span>(compReq);
+<span class="cm">// Blocks here until Nexus responds</span></pre>
+        </div>
+      </div>
+      <p class="step-desc" style="margin-top:10px;">
+        <strong>Why a stub?</strong> The workflow doesn't know the compliance team's address.
+        The stub is configured with the <code>compliance-endpoint</code> name — Temporal resolves
+        that to the <code>compliance-risk</code> task queue.
+      </p>
+    `,
+  },
+  {
+    id: 'nexus-boundary',
+    label: 'Nexus routes it',
+    activeBoxes: ['box-stub'],
+    activeArrows: ['arrow-call'],
+    title: 'Step 2 — Temporal routes across the Nexus boundary',
+    content: `
+      <p class="step-desc">
+        The stub call becomes a <strong>Nexus operation request</strong>.
+        Temporal serializes your <code>ComplianceRequest</code> to JSON and delivers it to
+        the <code>compliance-risk</code> task queue — the one the compliance worker is listening on.
+      </p>
+      <div class="data-flow">
+        <div style="padding:10px 12px; background:rgba(240,136,62,.07); border:1px solid rgba(240,136,62,.2); border-radius:6px; font-size:12px;">
+          <div style="color:var(--nexus-color); font-weight:700; margin-bottom:6px;">What travels across the boundary</div>
+          <div style="color:var(--muted); line-height:1.7;">
+            • Operation name: <code style="color:var(--text)">checkCompliance</code><br>
+            • Endpoint: <code style="color:var(--text)">compliance-endpoint</code><br>
+            • Input (JSON-serialized): <code style="color:var(--text)">ComplianceRequest</code><br>
+            • No HTTP. No REST. No service discovery URL.
+          </div>
+        </div>
+        <p class="step-desc" style="margin-top:10px;">
+          This is the key difference from a REST call: if the compliance worker is down,
+          Temporal <strong>retries automatically</strong>. The payment workflow stays durable.
+        </p>
+      </div>
+    `,
+  },
+  {
+    id: 'serviceimpl',
+    label: '@ServiceImpl receives',
+    activeBoxes: ['box-serviceimpl', 'box-opimpl'],
+    activeArrows: ['arrow-dispatch'],
+    title: 'Step 3 — @ServiceImpl receives the request',
+    content: `
+      <p class="step-desc">
+        The compliance worker has registered
+        <strong>ComplianceNexusServiceImpl</strong> via
+        <code>registerNexusServiceImplementation()</code>.
+        Temporal looks at the operation name (<code>checkCompliance</code>) and finds the
+        matching <code>@OperationImpl</code> method.
+      </p>
+      <div class="data-flow">
+        <div class="data-row">
+          <span class="data-tag in">IN</span>
+          <pre class="code-block"><span class="cm">// Temporal deserializes the JSON back to:</span>
+<span class="cl">ComplianceRequest</span> input = <span class="cm">/* from wire */</span>
+  transactionId = <span class="str">"TXN-B"</span>
+  amount        = <span class="num">12000.0</span>
+  senderCountry = <span class="str">"US"</span>
+  receiverCountry = <span class="str">"UK"</span>
+  description   = <span class="str">"International consulting fee"</span></pre>
+        </div>
+        <div class="data-row">
+          <span class="data-tag out">DISPATCH</span>
+          <pre class="code-block"><span class="cm">// Temporal calls this method on the impl class:</span>
+<span class="anno">@OperationImpl</span>
+<span class="kw">public</span> <span class="cl">OperationHandler</span>&lt;<span class="cl">ComplianceRequest</span>, <span class="cl">ComplianceResult</span>&gt;
+    <span class="fn">checkCompliance</span>() { ... }</pre>
+        </div>
+      </div>
+      <p class="step-desc" style="margin-top:10px;">
+        <strong>Name matching is exact.</strong> If the interface declares
+        <code>checkCompliance</code> and your method is named <code>runCheck</code>,
+        Temporal finds no handler — callers get a runtime error.
+      </p>
+    `,
+  },
+  {
+    id: 'lambda',
+    label: 'Lambda executes',
+    activeBoxes: ['box-lambda'],
+    activeArrows: ['arrow-lambda'],
+    title: 'Step 4 — The sync lambda executes',
+    content: `
+      <p class="step-desc">
+        <code>checkCompliance()</code> returns a handler built by
+        <strong>WorkflowClientOperationHandlers.sync()</strong>.
+        Temporal immediately invokes the lambda — this runs inline, synchronously,
+        on the compliance worker thread.
+      </p>
+      <div class="data-flow">
+        <div class="data-row">
+          <span class="data-tag param">PARAMS</span>
+          <pre class="code-block">(<span class="fn">context</span>, <span class="fn">details</span>, <span class="fn">client</span>, <span class="fn">input</span>) -&gt; ...</pre>
+        </div>
+      </div>
+      <table class="param-table">
+        <thead>
+          <tr><th>Param</th><th>Type</th><th>Used?</th><th>What it is</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="param-name">context</td>
+            <td class="param-type">OperationContext</td>
+            <td><span class="param-used no">skip</span></td>
+            <td style="font-size:11px;color:var(--muted)">Request metadata (headers, etc.)</td>
+          </tr>
+          <tr>
+            <td class="param-name">details</td>
+            <td class="param-type">StartOperationDetails</td>
+            <td><span class="param-used no">skip</span></td>
+            <td style="font-size:11px;color:var(--muted)">Callback URLs for async ops</td>
+          </tr>
+          <tr>
+            <td class="param-name">client</td>
+            <td class="param-type">WorkflowClient</td>
+            <td><span class="param-used no">skip</span></td>
+            <td style="font-size:11px;color:var(--muted)">Start child workflows (async Nexus)</td>
+          </tr>
+          <tr>
+            <td class="param-name"><strong>input</strong></td>
+            <td class="param-type">ComplianceRequest</td>
+            <td><span class="param-used yes">✓ used</span></td>
+            <td style="font-size:11px;color:var(--muted)">The actual data from the Payments workflow</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="step-desc" style="margin-top:10px;">
+        Only <code>input</code> matters here. The other three are tools for advanced
+        patterns — you'll see <code>client</code> used in Exercise 1300 for async Nexus.
+      </p>
+    `,
+  },
+  {
+    id: 'agent',
+    label: 'Agent calls LLM',
+    activeBoxes: ['box-agent'],
+    activeArrows: ['arrow-agent'],
+    title: 'Step 5 — ComplianceAgent calls OpenAI',
+    content: `
+      <p class="step-desc">
+        The lambda passes <code>input</code> straight to
+        <strong>ComplianceAgent.checkCompliance()</strong> — a regular Java method,
+        no Temporal involved. The agent constructs a prompt, calls OpenAI,
+        and parses the structured response.
+      </p>
+      <div class="data-flow">
+        <div class="data-row">
+          <span class="data-tag in">IN</span>
+          <pre class="code-block"><span class="fn">complianceAgent</span>.<span class="fn">checkCompliance</span>(input)
+<span class="cm">// input == the ComplianceRequest from step 3</span></pre>
+        </div>
+        <div class="data-row">
+          <span class="data-tag out">OUT</span>
+          <pre class="code-block"><span class="kw">new</span> <span class="cl">ComplianceResult</span>(
+  transactionId = <span class="str">"TXN-B"</span>
+  approved      = <span class="kw">true</span>
+  riskLevel     = <span class="str">"MEDIUM"</span>
+  explanation   = <span class="str">"International transfer within normal"</span>
+               + <span class="str">" range. Proceed with monitoring."</span>
+)</pre>
+        </div>
+      </div>
+      <p class="step-desc" style="margin-top:10px;">
+        This is a plain method call with network I/O — exactly the kind of thing
+        that belongs in an <strong>Activity</strong>. If you want Temporal's retry
+        guarantees here, wrap it in an activity instead.
+      </p>
+    `,
+  },
+  {
+    id: 'result',
+    label: 'Result returns',
+    activeBoxes: ['box-result', 'box-workflow'],
+    activeArrows: ['arrow-return'],
+    title: 'Step 6 — ComplianceResult travels back',
+    content: `
+      <p class="step-desc">
+        The lambda returns the <code>ComplianceResult</code>. Temporal serializes it,
+        delivers it back across the Nexus boundary, and the payment workflow
+        <strong>unblocks</strong>.
+      </p>
+      <div class="data-flow">
+        <div class="data-row">
+          <span class="data-tag out">BACK</span>
+          <pre class="code-block"><span class="cl">ComplianceResult</span> result =
+  complianceService.<span class="fn">checkCompliance</span>(compReq);
+<span class="cm">// This line returns NOW</span>
+
+<span class="kw">if</span> (result.<span class="fn">isApproved</span>()) {
+  <span class="cm">// Step 3: execute the payment</span>
+  <span class="fn">executePayment</span>(request);
+} <span class="kw">else</span> {
+  <span class="cm">// Return declined result</span>
+  <span class="kw">return new</span> <span class="cl">PaymentResult</span>(<span class="str">"DECLINED"</span>, ...);
+}</pre>
+        </div>
+      </div>
+      <p class="step-desc" style="margin-top:10px;">
+        For TXN-A and TXN-B: <code>approved = true</code> → payment executes.<br>
+        For TXN-C (<em>US → North Korea, $75k</em>): <code>approved = false</code> → workflow
+        returns a declined result without touching the payment gateway.
+      </p>
+      <div style="margin-top:12px; padding:10px 12px; background:rgba(63,185,80,.07); border:1px solid rgba(63,185,80,.2); border-radius:6px; font-size:12px; color:var(--muted);">
+        ✅ <strong>You've traced the full round trip.</strong><br>
+        Payments stub → Nexus boundary → @ServiceImpl → @OperationImpl → lambda → agent → OpenAI → result → back.
+      </div>
+    `,
+  },
+];
+
+// ─── State ───────────────────────────────────────────────────────
+let currentStep = 0;
+
+// ─── Box → step index map ─────────────────────────────────────────
+const BOX_STEP = {
+  'workflow': 1, 'stub': 1,
+  'serviceimpl': 3, 'opimpl': 3,
+  'lambda': 4,
+  'agent': 5,
+  'result': 6,
+};
+
+// ─── Build progress bar ───────────────────────────────────────────
+function buildProgressBar() {
+  const bar = document.getElementById('progressBar');
+  bar.innerHTML = '';
+  STEPS.forEach((s, i) => {
+    const pip = document.createElement('div');
+    pip.className = 'step-pip';
+    pip.innerHTML = `
+      <div class="pip-dot" id="pip-${i}">${i}</div>
+      <div class="pip-label">${s.label}</div>
+    `;
+    pip.onclick = () => goTo(i);
+    bar.appendChild(pip);
+    if (i < STEPS.length - 1) {
+      const conn = document.createElement('div');
+      conn.className = 'pip-connector';
+      conn.id = `conn-${i}`;
+      bar.appendChild(conn);
+    }
+  });
+}
+
+// ─── Render a step ────────────────────────────────────────────────
+function render() {
+  const s = STEPS[currentStep];
+
+  // Update progress pips
+  STEPS.forEach((_, i) => {
+    const pip = document.getElementById(`pip-${i}`);
+    pip.className = 'pip-dot';
+    if (i < currentStep)       pip.className += ' done';
+    else if (i === currentStep) pip.className += ' active';
+    if (i < STEPS.length - 1) {
+      const conn = document.getElementById(`conn-${i}`);
+      conn.className = 'pip-connector' + (i < currentStep ? ' done' : '');
+    }
+  });
+
+  // Clear all active boxes
+  document.querySelectorAll('.class-box').forEach(el => el.classList.remove('active-box'));
+  // Activate boxes for this step
+  (s.activeBoxes || []).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active-box');
+  });
+
+  // Arrows: show only the ones for this step
+  const ALL_ARROWS = ['arrow-call','arrow-dispatch','arrow-lambda','arrow-agent','arrow-return'];
+  ALL_ARROWS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('visible');
+  });
+  (s.activeArrows || []).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('visible');
+  });
+
+  // Panel
+  const card = document.getElementById('stepCard');
+  card.innerHTML = `
+    <h3>
+      <span class="step-num">${currentStep}</span>
+      ${s.title}
+    </h3>
+    ${s.content}
+  `;
+
+  // Buttons
+  document.getElementById('btnBack').disabled = currentStep === 0;
+  document.getElementById('btnNext').disabled = currentStep === STEPS.length - 1;
+  document.getElementById('btnNext').textContent = currentStep === STEPS.length - 1 ? 'Done ✓' : 'Next →';
+}
+
+function go(dir) { goTo(currentStep + dir); }
+function goTo(i) {
+  if (i < 0 || i >= STEPS.length) return;
+  currentStep = i;
+  render();
+}
+
+function selectBox(boxKey) {
+  const stepIdx = BOX_STEP[boxKey];
+  if (stepIdx !== undefined) goTo(stepIdx);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────
+buildProgressBar();
+render();
+</script>
+</body>
+</html>
