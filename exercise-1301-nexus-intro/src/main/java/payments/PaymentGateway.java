@@ -8,6 +8,8 @@ import payments.domain.PaymentRequest;
  *
  * Students use this class as-is — focus on Temporal integration, not payment logic.
  */
+
+// The gateway doesn't know about Temporal.
 public class PaymentGateway {
 
     public boolean validatePayment(PaymentRequest request) {

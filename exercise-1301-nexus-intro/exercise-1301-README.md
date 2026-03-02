@@ -10,9 +10,9 @@ You work at a digital bank. The **Payments team** processes transactions. Before
 
 Today they do this with a **direct method call** (simulating a REST API call in the real world). When the Compliance service is down, all payments fail instantly. If the check throws an exception, the payment is silently lost. There's no retry. No audit trail. No recovery.
 
-## Quickstart Docs By Temporal
+### Diagram
 
-🚀 [Get started in a few mins](https://docs.temporal.io/quickstarts?utm_campaign=awareness-nikolay-advolodkin&utm_medium=code&utm_source=github)
+> 🚀 **New to Temporal?** [Get started in a few mins](https://docs.temporal.io/quickstarts?utm_campaign=awareness-nikolay-advolodkin&utm_medium=code&utm_source=github)
 
 **Your mission:** Replace that fragile direct call with **Temporal Nexus** — durable, type-safe, automatically-retried cross-team communication.
 
@@ -352,6 +352,8 @@ Two new annotations to know:
 
 **The SYNC handler pattern** — for quick operations that return immediately:
 
+> 🗺️ **Want to see every hop visually?** Open [`ui/nexus-handler-flow.html`](ui/nexus-handler-flow.html) in your browser — it walks through exactly which class calls what, what data is passed in, and what comes out at each step.
+
 ```java
 @ServiceImpl(service = ComplianceNexusService.class)
 public class ComplianceNexusServiceImpl {
@@ -404,7 +406,101 @@ Temporal matches handler methods to `@Operation` interface methods by name. A mi
 
 </details>
 
+**Q: The sync handler calls an LLM — which is a real network call that can take several seconds. Why is it still called "sync"? And when would you switch to an async handler instead?**
+
+<details><summary>Answer</summary>
+
+"Sync" describes the **Nexus return model**, not whether I/O is allowed. A sync handler can freely do network calls, hit databases, call APIs — it just means: when you're done, return the result directly. The Payments workflow is durably suspended while it waits; it's not spinning. The LLM call fits because it completes in seconds.
+
+An **async** handler is for when "I'll have an answer eventually, but not right now." It immediately returns an operation handle, and a whole new Temporal workflow starts on the Compliance side to produce the result. Use async when the compliance check could take minutes or hours — for example, a human reviewer needs to approve the transaction, or the check involves a multi-step pipeline that needs its own retry/event history.
+
+Rule of thumb: if the operation completes in seconds, sync is fine. If it involves waiting on humans, polling an external system, or multi-step logic you want Temporal to manage independently — async.
+
 </details>
+
+</details>
+
+---
+
+### 🔥 Debugging Exercise: Break the Endpoint on Purpose
+
+> **Goal:** Experience the silent failure of a misconfigured Nexus endpoint, then diagnose and fix it with the CLI. This is one of the most common real-world Nexus mistakes — and it produces no obvious error.
+
+**Step 1 — Delete the working endpoint**
+
+```bash
+temporal operator nexus endpoint delete --name compliance-endpoint
+```
+
+**Step 2 — Recreate it with a wrong task queue name**
+
+```bash
+temporal operator nexus endpoint create \
+  --name compliance-endpoint \
+  --target-namespace default \
+  --target-task-queue compliance-WRONG
+```
+
+**Step 3 — Run the starter and observe what happens**
+
+```bash
+mvn compile exec:java@starter
+```
+
+Wait about 2 minutes. You will see:
+
+```
+nexus operation completed unsuccessfully
+  cause: operation timed out
+  timeoutType: TIMEOUT_TYPE_SCHEDULE_TO_CLOSE
+  endpoint: compliance-endpoint
+  operation: checkCompliance
+```
+
+Notice what you do **not** see: no error from the compliance worker, no stack trace, no "endpoint not found." The Nexus request was delivered to Temporal — but then routed to a task queue nobody was listening on. It sat there until the `scheduleToCloseTimeout` (2 minutes, configured in your workflow) expired.
+
+**This is the silent failure.** The call reached the server. It just never reached a handler.
+
+**Step 4 — Diagnose with the CLI**
+
+```bash
+temporal operator nexus endpoint get --name compliance-endpoint
+```
+
+Look at `targetTaskQueue` in the output. You'll see `compliance-WRONG`. That's your bug.
+
+<details>
+<summary>🧠 Quick check — what else produces this same timeout?</summary>
+
+<details><summary>Answer</summary>
+
+Three causes, all producing the same `SCHEDULE_TO_CLOSE` timeout:
+
+1. **Wrong task queue** (what you just triggered) — endpoint routes to a queue no worker polls
+2. **Compliance worker not running** — correct task queue, but no worker is up
+3. **Handler crashes on every attempt** — worker picks up the call but throws, retries exhaust the 2-minute window
+
+The timeout alone doesn't tell you which. Check in order:
+- `temporal operator nexus endpoint get` → is `targetTaskQueue` correct?
+- Compliance worker terminal → is it running? Any stack traces?
+- Compliance worker logs → is it receiving and processing the call?
+
+</details>
+
+</details>
+
+**Step 5 — Fix it and verify**
+
+```bash
+temporal operator nexus endpoint delete --name compliance-endpoint
+
+temporal operator nexus endpoint create \
+  --name compliance-endpoint \
+  --target-namespace default \
+  --target-task-queue compliance-risk
+```
+
+Run the starter again. All 3 transactions should complete normally.
 
 ---
 
@@ -422,7 +518,7 @@ This is the standard **CRAWL** worker pattern from previous exercises, with one 
 |------|------------|-----|
 | **C** — Connect | Connect to Temporal server | `WorkflowServiceStubs.newLocalServiceStubs()` → `WorkflowClient.newInstance(service)` |
 | **R** — Register | Create the worker factory and worker | `WorkerFactory.newInstance(client)` → `factory.newWorker("compliance-risk")` |
-| **A** — Activities | Register activity implementations | *(none in this worker — 1301's compliance handler is sync, no activities needed)* |
+| **A** — Activities | Register activity implementations | *(skip — see quiz below)* |
 | **W** — Wire | Register Nexus service handler ← **NEW** | `worker.registerNexusServiceImplementation(new ComplianceNexusServiceImpl(agent))` |
 | **L** — Launch | Start polling | `factory.start()` |
 
@@ -475,6 +571,14 @@ It must match the `--target-task-queue` argument you used in the `temporal opera
 
 </details>
 
+**Q: The CRAWL table above skips the "A — Activities" step for this worker. Why doesn't the Compliance worker need to register any activities?**
+
+<details><summary>Answer</summary>
+
+The compliance handler is **sync** — it runs entirely inside the `@OperationImpl` lambda, inline on the worker thread. The agent calls OpenAI directly from that lambda; nothing needs to be scheduled on a task queue. Activities exist to handle non-deterministic work that Temporal needs to schedule, retry, and track separately. Since the Nexus handler is already outside workflow determinism constraints, a plain method call to the agent is sufficient. In Exercise 1300, when you implement an *async* Nexus handler that starts a full Compliance workflow, that workflow *will* use activities — because then you want Temporal's retry guarantees on the LLM call itself.
+
+</details>
+
 </details>
 
 ---
@@ -483,7 +587,22 @@ It must match the `--target-task-queue` argument you used in the `temporal opera
 
 **File 4: `payments/temporal/PaymentProcessingWorkflowImpl.java`**
 
-This is the main orchestrator. It coordinates all three steps without doing any of the actual work itself. Three things to set up as class fields:
+This is the main orchestrator. It coordinates all three steps without doing any of the actual work itself.
+
+#### The SAVE Pattern — Every Workflow Impl Uses This
+
+> **"A good workflow SAVEs: wire your stubs, then orchestrate."**
+
+| Step | What you do | Where |
+|------|------------|-------|
+| **S** — Stubs | Declare `ActivityOptions` + activity stub + Nexus stub as **class fields** | Fields at top of class |
+| **A** — Act | Call `validatePayment()` via the activity stub | Step 1 in `processPayment()` |
+| **V** — Verify | Call `checkCompliance()` via the Nexus stub — gate on the result | Step 2 in `processPayment()` |
+| **E** — Execute | Call `executePayment()` via the activity stub — only if approved | Step 3 in `processPayment()` |
+
+> ⚠️ **S must happen at the class level, not inside the method.** Temporal workflow stubs must be declared as fields — if you create them inside `processPayment()`, they won't survive replay correctly.
+
+Three things to set up as class fields:
 
 #### 4a. Activity Options + Activity Stub (Exercise 01 pattern)
 
@@ -701,26 +820,56 @@ public static void main(String[] args) {
 }
 ```
 
-> **Analogy:** Like setting `compliance.api.url=https://compliance-service` in `application.properties`. The workflow defines WHAT to call. The worker config defines WHERE.
-
-> **Compare with `ComplianceWorkerApp`:**
-> - Compliance worker: `registerNexusServiceImplementation(...)` → **receives** incoming Nexus requests
-> - Payments worker: `setNexusServiceOptions(...)` → **sends** outgoing Nexus requests
-> Handler side vs caller side. Both use "compliance-endpoint" as the name. They match.
+> ### Two Sides of a Nexus Connection
+>
+> Think of Nexus like a **phone system**. For a call to work, two things must be true:
+>
+> 1. **Someone must answer** — the Compliance worker registers its handler ("I'm here, I answer calls on this line")
+> 2. **Someone must know the number** — the Payments worker knows which endpoint to dial when the workflow needs compliance
+>
+> **Side 1: Compliance Worker — The Receiver**
+>
+> ```java
+> worker.registerNexusServiceImplementation(new ComplianceNexusServiceImpl(agent));
+> ```
+>
+> This says: *"This worker handles incoming Nexus requests."* It's like plugging in a phone — *"This office answers the compliance line."*
+> The task queue `"compliance-risk"` is the physical address — it's what you set with `--target-task-queue` in the CLI. If these strings don't match, calls are never delivered.
+>
+> **Side 2: Payments Worker — The Caller**
+>
+> ```java
+> .setEndpoint("compliance-endpoint")
+> ```
+>
+> This says: *"When the workflow uses `ComplianceNexusService`, dial `compliance-endpoint` to reach it."*
+> The workflow only knows the interface (`ComplianceNexusService`). The worker injects the routing at startup — exactly like `application.properties` injecting a service URL.
+>
+> **The string that must match**
+>
+> ```
+> Workflow code:      "I need ComplianceNexusService.check()"  ← just the interface
+> Payments worker:    ComplianceNexusService → "compliance-endpoint"  ← the routing
+> Temporal server:    routes "compliance-endpoint" → "compliance-risk" task queue
+> Compliance worker:  listening on "compliance-risk" → my handler answers
+> ```
+>
+> `"compliance-endpoint"` appears in three places: the CLI command, the Payments worker config, and the CLI's `--target-task-queue` binding for the Compliance worker. If any don't match — no error, just silence. The call never connects.
+>
+> > 🗺️ See this visually: open [`ui/nexus-two-sides.svg`](ui/nexus-two-sides.svg) in your browser — animated call flow showing both sides and the matching string.
 
 ---
 
-#### The START Pattern — Every Starter Uses This
+#### The WIRE Pattern — Every Starter Uses This
 
-> **"Starters START workflows."**
+> **"To send a payment, you WIRE it: connect, set the destination, get the handle, send."**
 
-| Step | What | API |
-|------|------|-----|
-| **S** | Service: Connect to Temporal | `WorkflowServiceStubs.newLocalServiceStubs()` → `WorkflowClient.newInstance()` |
-| **T** | Target: Build `WorkflowOptions` | `.setTaskQueue("payments-processing").setWorkflowId("payment-" + txnId)` |
-| **A** | Acquire: Create typed stub | `client.newWorkflowStub(PaymentProcessingWorkflow.class, options)` |
-| **R** | Run: Fire off the workflow | `stub.processPayment(txn)` ← blocks until complete |
-| **T** | Track: Print result | Log `result.getStatus()`, `result.getRiskLevel()`, etc. |
+| Step | What you do | API |
+|------|------------|-----|
+| **W** | **Wire** the connection: `WorkflowServiceStubs` + `WorkflowClient` | `WorkflowServiceStubs.newLocalServiceStubs()` → `WorkflowClient.newInstance(service)` |
+| **I** | **ID + queue**: set `workflowId` and `taskQueue` in `WorkflowOptions` | `.setTaskQueue("payments-processing").setWorkflowId("payment-" + txnId)` |
+| **R** | **Resolve** a typed stub via `client.newWorkflowStub()` | `client.newWorkflowStub(PaymentProcessingWorkflow.class, options)` |
+| **E** | **Execute**: call the workflow method on the stub | `stub.processPayment(txn)` ← blocks until the workflow completes |
 
 **File 6: `payments/temporal/PaymentStarter.java`**
 
@@ -739,15 +888,15 @@ public static void main(String[] args) {
             "Business consulting services", "ACC-005", "ACC-006"),
     };
 
-    // S — Connect to Temporal
+    // W — Wire the connection
     WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
     WorkflowClient client = WorkflowClient.newInstance(service);
 
     for (PaymentRequest txn : transactions) {
-        // T — Target: business ID workflow ID (not random UUID!)
+        // I — ID + queue (business ID, not random UUID!)
         String workflowId = "payment-" + txn.getTransactionId(); // "payment-TXN-A"
 
-        // A — Acquire: typed workflow stub
+        // R — Resolve a typed stub
         PaymentProcessingWorkflow wf = client.newWorkflowStub(
                 PaymentProcessingWorkflow.class,
                 WorkflowOptions.newBuilder()
@@ -757,10 +906,10 @@ public static void main(String[] args) {
 
         System.out.println("Starting: " + workflowId);
 
-        // R — Run: blocks until workflow completes
+        // E — Execute: blocks until workflow completes
         PaymentResult result = wf.processPayment(txn);
 
-        // T — Track: print result
+        // print result
         System.out.printf("  → %s | risk=%s | conf=%s%n",
                 result.getStatus(),
                 result.getRiskLevel(),
@@ -772,7 +921,7 @@ public static void main(String[] args) {
     }
 
     System.out.println("View in Temporal UI: http://localhost:8233");
-    System.out.println("View interactive diagram: open ui/index.html");
+    System.out.println("View interactive diagram: open ui/nexus-workflow.html");
 }
 ```
 
@@ -875,7 +1024,7 @@ View in Temporal UI: http://localhost:8233
 ### Optional: Interactive Diagram
 
 ```bash
-open ui/index.html
+open ui/nexus-workflow.html
 ```
 
 No install needed. Choose TXN-A/B/C, step through the flow, toggle REST vs Nexus to see why the old approach fails, click any component to learn what it does.

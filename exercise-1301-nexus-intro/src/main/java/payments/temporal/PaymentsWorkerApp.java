@@ -7,6 +7,7 @@ import io.temporal.worker.WorkerFactory;
 import io.temporal.worker.WorkflowImplementationOptions;
 import io.temporal.workflow.NexusServiceOptions;
 import payments.PaymentGateway;
+import payments.Shared;
 import payments.temporal.activity.PaymentActivityImpl;
 
 import java.util.Collections;
@@ -50,17 +51,37 @@ import java.util.Collections;
  */
 public class PaymentsWorkerApp {
 
-    private static final String TASK_QUEUE = "payments-processing";
-
     public static void main(String[] args) {
         // TODO: C — Connect to Temporal
+        WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
+        WorkflowClient client = WorkflowClient.newInstance(service);
 
         // TODO: R — Create factory and worker, then register PaymentProcessingWorkflowImpl
         //           using WorkflowImplementationOptions with Nexus endpoint mapping
+        WorkerFactory factory = WorkerFactory.newInstance(client);
+        Worker worker = factory.newWorker(Shared.TASK_QUEUE);
+        // R + W — Register workflow WITH Nexus endpoint mapping
+        //
+        // The workflow knows WHAT to call (ComplianceNexusService).
+        // The worker knows WHERE to find it ("compliance-endpoint").
+        // This keeps the workflow portable — change endpoints without touching workflow code.
+        String nexusServiceInterfaceName = "ComplianceNexusService";
+        worker.registerWorkflowImplementationTypes(
+                WorkflowImplementationOptions.newBuilder()
+                        .setNexusServiceOptions(Collections.singletonMap(
+                                nexusServiceInterfaceName,           // interface name (no package)
+                                NexusServiceOptions.newBuilder()
+                                        .setEndpoint("compliance-endpoint")  // matches the CLI endpoint
+                                        .build()))
+                        .build(),
+                PaymentProcessingWorkflowImpl.class);
 
         // TODO: A — Register PaymentActivityImpl (inject a PaymentGateway)
+        // activities typically get something injected
+        PaymentGateway gateway = new PaymentGateway();
+        worker.registerActivitiesImplementations(new PaymentActivityImpl(gateway));
 
         // TODO: L — Launch and print startup banner
-        throw new UnsupportedOperationException("TODO: implement PaymentsWorkerApp");
+        factory.start();
     }
 }

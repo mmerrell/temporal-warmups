@@ -63,17 +63,72 @@ import java.time.Duration;
 public class PaymentProcessingWorkflowImpl implements PaymentProcessingWorkflow {
 
     // TODO: Create ACTIVITY_OPTIONS (startToCloseTimeout, RetryOptions)
+    private static final ActivityOptions ACTIVITY_OPTIONS = ActivityOptions.newBuilder()
+            .setStartToCloseTimeout(Duration.ofSeconds(30))  // how long can one attempt take?
+            .setRetryOptions(RetryOptions.newBuilder()
+                    .setInitialInterval(Duration.ofSeconds(1))  // wait 1s before first retry
+                    .setBackoffCoefficient(2)                   // double the wait each time
+                    .build())
+            .build();
 
     // TODO: Create a paymentActivity stub using Workflow.newActivityStub()
+    private final PaymentActivity paymentActivity =
+            Workflow.newActivityStub(PaymentActivity.class, ACTIVITY_OPTIONS);
 
     // TODO: Create a complianceService Nexus stub using Workflow.newNexusServiceStub()
+    private final ComplianceNexusService complianceService = Workflow.newNexusServiceStub(
+            ComplianceNexusService.class,
+            NexusServiceOptions.newBuilder()
+                    .setOperationOptions(NexusOperationOptions.newBuilder()
+                            .setScheduleToCloseTimeout(Duration.ofMinutes(2))
+                            .build())
+                    .build());
 
     @Override
     public PaymentResult processPayment(PaymentRequest request) {
         // TODO: Implement 3-step orchestration
-        //   Step 1: Validate payment (activity)
-        //   Step 2: Check compliance via Nexus — the key new step
-        //   Step 3: Execute payment (activity, only if approved)
-        throw new UnsupportedOperationException("TODO: implement processPayment");
+        try {
+            // Step 1: Validate payment (Payments team)
+            boolean valid = paymentActivity.validatePayment(request);
+            if (!valid) {
+                System.out.println("  REJECTED: Validation failed — payment lost, no retry\n");
+            }
+            System.out.println("  Step 1 passed: validation OK");
+
+            // Step 2: Call Compliance team for risk check
+            // PROBLEM: Direct call — no retries, no durability, tight coupling
+            ComplianceRequest compReq = new ComplianceRequest(
+                    request.getTransactionId(), request.getAmount(),
+                    request.getSenderCountry(), request.getReceiverCountry(),
+                    request.getDescription());
+
+            System.out.println("  Step 2: calling Compliance team...");
+            ComplianceResult compliance = complianceService.checkCompliance(compReq);
+            System.out.println("  Compliance result: " + compliance.getRiskLevel()
+                    + " | approved=" + compliance.isApproved());
+            System.out.println("  Reason: " + compliance.getExplanation());
+
+            if (!compliance.isApproved()) {
+                System.out.println("  DECLINED: Compliance blocked this transaction");
+                System.out.println("  ** No audit trail — why was it declined? Who decided? **\n");
+            }
+
+            // Step 3: Execute payment
+            // PROBLEM: If step 2 succeeded but this crashes, we don't know
+            System.out.println("  Step 3: executing payment...");
+            String confirmation = paymentActivity.executePayment(request);
+            System.out.println("  COMPLETED: " + confirmation);
+            return new PaymentResult(true, request.getTransactionId(), "COMPLETED",
+                    compliance.getRiskLevel(),
+                    compliance.getExplanation(),
+                    confirmation,
+                    null);
+
+        } catch (Exception e) {
+            Workflow.getLogger(PaymentProcessingWorkflowImpl.class)
+                    .error("Workflow failed: " + e.getMessage());
+            return new PaymentResult(false, request.getTransactionId(), "FAILED",
+                    null, null, null, e.getMessage());
+        }
     }
 }

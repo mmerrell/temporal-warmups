@@ -5,6 +5,8 @@ import io.temporal.client.WorkflowClient;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.worker.Worker;
 import io.temporal.worker.WorkerFactory;
+import payments.Shared;
+import payments.temporal.PaymentProcessingWorkflowImpl;
 
 /**
  * YOUR TURN: Start the Compliance team's worker.
@@ -45,18 +47,27 @@ import io.temporal.worker.WorkerFactory;
  */
 public class ComplianceWorkerApp {
 
-    private static final String TASK_QUEUE = "compliance-risk";
-
     public static void main(String[] args) {
         // TODO: C — Connect to Temporal
+        WorkflowServiceStubs service = WorkflowServiceStubs.newLocalServiceStubs();
+        WorkflowClient client = WorkflowClient.newInstance(service);
 
-        // TODO: R — Create the worker factory and worker on TASK_QUEUE
+        // R — Register workflow types
+        WorkerFactory factory = WorkerFactory.newInstance(client);
+        Worker worker = factory.newWorker(Shared.TASK_QUEUE);
+        worker.registerWorkflowImplementationTypes(PaymentProcessingWorkflowImpl.class);
+
+        //A:ctivities - none here. Why?
 
         // TODO: W — Create a ComplianceAgent and register the Nexus service implementation
+        ComplianceAgent agent = new ComplianceAgent();
+        worker.registerNexusServiceImplementation(new ComplianceNexusServiceImpl(agent));
 
         // TODO: L — Start the factory
+        factory.start();
 
         // TODO: Print startup banner
-        throw new UnsupportedOperationException("TODO: implement ComplianceWorkerApp");
+        System.out.println("Compliance Worker started on compliance-risk");
+        System.out.println("Waiting for Nexus requests from Payments team...");
     }
 }

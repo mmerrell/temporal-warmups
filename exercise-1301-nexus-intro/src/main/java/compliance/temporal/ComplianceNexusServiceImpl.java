@@ -7,6 +7,7 @@ import io.nexusrpc.handler.OperationHandler;
 import io.nexusrpc.handler.OperationImpl;
 import io.nexusrpc.handler.ServiceImpl;
 import io.temporal.nexus.WorkflowClientOperationHandlers;
+import org.checkerframework.checker.units.qual.C;
 import shared.nexus.ComplianceNexusService;
 
 /**
@@ -46,16 +47,26 @@ import shared.nexus.ComplianceNexusService;
  * workflow on the Compliance side instead of running inline.
  */
 // TODO: Add @ServiceImpl annotation
+@ServiceImpl(service = ComplianceNexusService.class)
 public class ComplianceNexusServiceImpl {
 
     // TODO: Add a ComplianceAgent field
+    private final ComplianceAgent complianceAgent;
 
     // TODO: Add a constructor that accepts ComplianceAgent
+    public ComplianceNexusServiceImpl(ComplianceAgent agent){
+        complianceAgent = agent;
+    }
 
     // TODO: Add @OperationImpl annotation
     // Note: method name must match the interface — checkCompliance
+    // Temporal matches handler methods to @Operation interface methods by name.
+    // A mismatch means the operation has no handler registered — callers get a runtime error
+    @OperationImpl
     public OperationHandler<ComplianceRequest, ComplianceResult> checkCompliance() {
         // TODO: Return a sync handler that delegates to the agent
-        throw new UnsupportedOperationException("TODO: implement checkCompliance handler");
+        return WorkflowClientOperationHandlers.sync(
+                (context, details, client, input) -> complianceAgent.checkCompliance(input)
+        );
     }
 }
