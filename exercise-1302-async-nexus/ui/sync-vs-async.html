@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sync vs Async Nexus — Exercise 1302</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  h1 {
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.85rem;
+    margin-bottom: 28px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .panel {
+    background: #1e2433;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #2d3748;
+  }
+  .panel.bad { border-top: 3px solid #ef4444; }
+  .panel.good { border-top: 3px solid #22c55e; }
+  .panel-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .panel.bad .panel-title { color: #ef4444; }
+  .panel.good .panel-title { color: #22c55e; }
+  .panel-desc {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 16px;
+  }
+
+  /* Timeline */
+  .timeline { position: relative; }
+  .track {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 16px;
+    gap: 10px;
+  }
+  .track-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #94a3b8;
+    width: 80px;
+    flex-shrink: 0;
+    padding-top: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .bars { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .bar {
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bar-validate { background: #1e40af; color: #bfdbfe; width: 20%; }
+  .bar-wait-sync { background: #7c2d12; color: #fed7aa; width: 60%; border: 1px dashed #ea580c; }
+  .bar-timeout { background: #991b1b; color: #fecaca; width: 25%; }
+  .bar-gap { background: transparent; width: 20%; }
+  .bar-compliance-phase1 { background: #065f46; color: #6ee7b7; width: 33%; }
+  .bar-compliance-phase2 { background: #064e3b; color: #a7f3d0; width: 33%; }
+  .bar-compliance-phase3 { background: #065f46; color: #6ee7b7; width: 33%; }
+  .bar-start { background: #1e40af; color: #bfdbfe; width: 20%; }
+  .bar-handle { background: #312e81; color: #c7d2fe; width: 20%; border: 1px solid #818cf8; }
+  .bar-suspended { background: #1e293b; color: #475569; width: 60%; border: 1px dashed #475569; font-style: italic; }
+  .bar-resume { background: #064e3b; color: #6ee7b7; width: 15%; }
+  .bar-execute { background: #1d4ed8; color: #bfdbfe; width: 15%; }
+  .bar-async-phase1 { background: #065f46; color: #6ee7b7; width: 33%; }
+  .bar-async-phase2 { background: #064e3b; color: #a7f3d0; width: 33%; }
+  .bar-async-phase3 { background: #065f46; color: #6ee7b7; width: 33%; }
+
+  .row-bars { display: flex; gap: 3px; align-items: center; }
+
+  .result-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    margin-top: 12px;
+  }
+  .result-fail { background: #7f1d1d; color: #fca5a5; }
+  .result-pass { background: #14532d; color: #86efac; }
+
+  .code-block {
+    background: #111827;
+    border-radius: 8px;
+    padding: 12px;
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.72rem;
+    color: #e2e8f0;
+    margin-top: 14px;
+    border: 1px solid #1f2937;
+    line-height: 1.6;
+  }
+  .kw { color: #c792ea; }
+  .type { color: #82aaff; }
+  .method { color: #82aaff; }
+  .string { color: #c3e88d; }
+  .comment { color: #546e7a; font-style: italic; }
+  .new-line { color: #ffcb6b; }
+
+  .time-axis {
+    display: flex;
+    margin-left: 90px;
+    margin-bottom: 8px;
+    font-size: 0.65rem;
+    color: #475569;
+  }
+  .time-mark {
+    flex: 1;
+    text-align: left;
+  }
+
+  .verdict {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+  .verdict.fail { background: #1c0e0e; border: 1px solid #7f1d1d; color: #fca5a5; }
+  .verdict.pass { background: #0c1e14; border: 1px solid #14532d; color: #86efac; }
+
+  .divider {
+    height: 1px;
+    background: #2d3748;
+    margin: 14px 0;
+  }
+</style>
+</head>
+<body>
+<h1>Sync vs Async Nexus</h1>
+<p class="subtitle">Same compliance check · Different handler · Very different outcomes</p>
+
+<div class="grid">
+
+  <!-- LEFT: SYNC (broken) -->
+  <div class="panel bad">
+    <div class="panel-title">Sync Nexus (Exercise 1301)</div>
+    <div class="panel-desc">Handler runs inline · Caller blocks · 5s timeout · 30s investigation = CRASH</div>
+
+    <div class="timeline">
+      <div class="time-axis">
+        <span class="time-mark">0s</span>
+        <span class="time-mark">5s</span>
+        <span class="time-mark">10s</span>
+        <span class="time-mark">15s</span>
+        <span class="time-mark">20s</span>
+      </div>
+
+      <div class="track">
+        <div class="track-label">Payments</div>
+        <div class="bars">
+          <div class="row-bars">
+            <div class="bar bar-validate">validate</div>
+            <div class="bar bar-wait-sync">⏳ waiting for compliance... (BLOCKED)</div>
+            <div class="bar bar-timeout">💥 TIMEOUT</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="track">
+        <div class="track-label">Compliance</div>
+        <div class="bars">
+          <div class="row-bars">
+            <div class="bar bar-gap"></div>
+            <div class="bar bar-compliance-phase1">Phase 1</div>
+            <div class="bar bar-compliance-phase2">Phase 2</div>
+            <div class="bar bar-compliance-phase3">Phase 3</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="verdict fail">
+      <strong>What happens:</strong> Payments workflow times out at 5s.
+      The compliance investigation continues for 30s, then finishes —
+      but nobody is listening. Transaction is permanently lost.
+      No retry. No audit trail. On-call engineer paged.
+    </div>
+
+    <div class="code-block">
+<span class="comment">// 1301: sync handler — runs INLINE</span>
+<span class="kw">return</span> WorkflowClientOperationHandlers
+  .<span class="method">sync</span>(
+    (ctx, det, client, input) <span class="kw">-&gt;</span>
+      agent.<span class="method">checkCompliance</span>(input)
+    <span class="comment">// ↑ This runs inside the handler.
+    // Caller WAITS for this to return.</span>
+  );
+    </div>
+  </div>
+
+  <!-- RIGHT: ASYNC (working) -->
+  <div class="panel good">
+    <div class="panel-title">Async Nexus (Exercise 1302)</div>
+    <div class="panel-desc">Handler starts a workflow · Caller holds a handle · Investigation runs independently</div>
+
+    <div class="timeline">
+      <div class="time-axis">
+        <span class="time-mark">0s</span>
+        <span class="time-mark">5s</span>
+        <span class="time-mark">10s</span>
+        <span class="time-mark">15s</span>
+        <span class="time-mark">20s</span>
+      </div>
+
+      <div class="track">
+        <div class="track-label">Payments</div>
+        <div class="bars">
+          <div class="row-bars">
+            <div class="bar bar-start">validate</div>
+            <div class="bar bar-handle">start+handle</div>
+            <div class="bar bar-suspended">💤 suspended (not blocking a thread)</div>
+            <div class="bar bar-resume">resume</div>
+            <div class="bar bar-execute">execute</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="track">
+        <div class="track-label">Compliance</div>
+        <div class="bars">
+          <div class="row-bars">
+            <div class="bar bar-gap"></div>
+            <div class="bar bar-async-phase1">Phase 1</div>
+            <div class="bar bar-async-phase2">Phase 2</div>
+            <div class="bar bar-async-phase3">Phase 3 ✓</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="verdict pass">
+      <strong>What happens:</strong> Payments workflow starts the Nexus operation and
+      suspends — no thread blocked, no timeout risk. The compliance workflow runs
+      all 3 phases. When done, Temporal resumes the Payments workflow with the result.
+      Transaction completes successfully. Full audit trail in Temporal UI.
+    </div>
+
+    <div class="code-block">
+<span class="comment">// 1302: async handler — starts a WORKFLOW</span>
+<span class="kw">return</span> WorkflowClientOperationHandlers
+  .<span class="method">fromWorkflowMethod</span>(
+    (ctx, det, client, input) <span class="kw">-&gt;</span>
+      client.<span class="method">newWorkflowStub</span>(
+        <span class="type">ComplianceInvestigationWorkflow</span>.<span class="kw">class</span>,
+        WorkflowOptions.<span class="method">newBuilder</span>()
+          .<span class="method">setWorkflowId</span>(<span class="string">"investigation-"</span>
+            + input.<span class="method">getTransactionId</span>())
+          .<span class="method">build</span>()
+      )::<span class="method">investigate</span>
+    <span class="comment">// ↑ Returns immediately.
+    // Temporal starts the workflow and
+    // gives back an operation token.</span>
+  );
+    </div>
+  </div>
+
+</div>
+
+<div style="max-width:900px;margin:20px auto;text-align:center;color:#475569;font-size:0.78rem;">
+  The Nexus interface (<code>ComplianceNexusService</code>) is identical in both exercises.
+  The <em>caller</em> doesn't know (or care) whether the handler is sync or async.
+  Only the handler implementation changes.
+</div>
+
+</body>
+</html>
