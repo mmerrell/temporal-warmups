@@ -10,7 +10,6 @@ You work at a digital bank. The **Payments team** processes transactions. Before
 
 Today they do this with a **direct method call** (simulating a REST API call in the real world). When the Compliance service is down, all payments fail instantly. If the check throws an exception, the payment is silently lost. There's no retry. No audit trail. No recovery.
 
-### Diagram
 
 > 🚀 **New to Temporal?** [Get started in a few mins](https://docs.temporal.io/quickstarts?utm_campaign=awareness-nikolay-advolodkin&utm_medium=code&utm_source=github)
 
