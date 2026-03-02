@@ -54,8 +54,7 @@ public class ComplianceWorkerApp {
 
         // R — Register workflow types
         WorkerFactory factory = WorkerFactory.newInstance(client);
-        Worker worker = factory.newWorker(Shared.TASK_QUEUE);
-        worker.registerWorkflowImplementationTypes(PaymentProcessingWorkflowImpl.class);
+        Worker worker = factory.newWorker("compliance-risk");
 
         //A:ctivities - none here. Why?
 
