@@ -74,15 +74,15 @@ temporal-warmups/
 
 Each exercise contains:
 - `README.md` or `exercise-XX-README.md` - Exercise goals and instructions
-- `pre-temporal.py` or similar - Original code without Temporal
-- Language-specific implementations (`python/`, `java/`, `go/`, `typescript/`)
-- .svg diagrams to show workflows (similar to exercise-1300)
-- index.html interactive diagram to visually convey temporal workflows (similar to exercise-1301)
+- Original code without Temporal which needs to be "temporalized"
+- Language-specific implementation folder (`python/`, `java/`, `go/`, `typescript/`)
+- .svg diagrams to show workflow and different concepts (similar to exercise-1300)
+-  interactive .html diagram to visually convey data flows, nexus boundaries, data mutation (similar to exercise-1301)
 - cool and interesting interactive diagrams embedded in the README to help the student learn
 - Step-by-step guidance, acronyms similar to exercise 1300, metaphors, humor
 - The poor implementation is located in /exercise folder along with skeleton of Temporal classes. The /solution folder contains the full solution to the exercise.
-- We begin each exercise by executing code and understanding the problem through a running app.
-- Every small lesson contains a checkpoint to run code and test.
+- We begin each exercise by executing code and understanding the problem through a running app. Show something running as fast as possible.
+- Every small lesson contains a checkpoint to run code and test new implementation.
 - Every few exercises we also have small quizzes for people to try.
 - Every exercise also has some humor and interesting analogies.
 
