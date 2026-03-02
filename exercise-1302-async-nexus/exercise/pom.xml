@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.temporal.warmups</groupId>
+    <artifactId>exercise-1302-async-nexus-java</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>Exercise 1302 - Temporal Async Nexus (Java)</name>
+    <description>Upgrade from sync to async Nexus: one new concept, infinite new possibilities</description>
+
+    <properties>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <temporal.version>1.27.0</temporal.version>
+    </properties>
+
+    <dependencies>
+        <!-- Temporal SDK -->
+        <dependency>
+            <groupId>io.temporal</groupId>
+            <artifactId>temporal-sdk</artifactId>
+            <version>${temporal.version}</version>
+        </dependency>
+
+        <!-- SLF4J for logging -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.9</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+                <configuration>
+                    <source>11</source>
+                    <target>11</target>
+                </configuration>
+            </plugin>
+
+            <!-- Exec plugin: 6 execution targets -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+                <configuration>
+                    <!-- Default: mvn compile exec:java — Checkpoint 0: sync timeout demo -->
+                    <mainClass>exercise.PaymentProcessingService</mainClass>
+                </configuration>
+                <executions>
+                    <!-- Checkpoint 1: mvn compile exec:java@activity-test -->
+                    <execution>
+                        <id>activity-test</id>
+                        <configuration>
+                            <mainClass>compliance.temporal.InvestigationActivityTest</mainClass>
+                        </configuration>
+                    </execution>
+                    <!-- Checkpoint 2: Terminal 3: mvn compile exec:java@compliance-worker -->
+                    <execution>
+                        <id>compliance-worker</id>
+                        <configuration>
+                            <mainClass>compliance.temporal.ComplianceWorkerApp</mainClass>
+                        </configuration>
+                    </execution>
+                    <!-- Checkpoint 2: Terminal 4: mvn compile exec:java@payments-worker -->
+                    <execution>
+                        <id>payments-worker</id>
+                        <configuration>
+                            <mainClass>payments.temporal.PaymentsWorkerApp</mainClass>
+                        </configuration>
+                    </execution>
+                    <!-- Checkpoint 3: Terminal 5: mvn compile exec:java@starter -->
+                    <execution>
+                        <id>starter</id>
+                        <configuration>
+                            <mainClass>payments.temporal.PaymentStarter</mainClass>
+                        </configuration>
+                    </execution>
+                    <!-- Checkpoint 4 (Heist Test): mvn compile exec:java@starter-rerun -->
+                    <execution>
+                        <id>starter-rerun</id>
+                        <configuration>
+                            <mainClass>payments.temporal.PaymentStarterRerun</mainClass>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
