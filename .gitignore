@@ -141,3 +141,7 @@ docker-compose.override.yml
 *.tmp
 *.temp
 .cache/
+
+### UI Runtime ###
+processing-state.json
+.next/

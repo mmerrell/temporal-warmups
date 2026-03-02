@@ -1,0 +1,328 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 920" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <style>
+    /* Column backgrounds */
+    .payments-bg { fill: #EBF5FB; }
+    .compliance-bg { fill: #EAFAF1; }
+
+    /* Box styles */
+    .box-payments { fill: #D4E6F1; stroke: #2980B9; stroke-width: 1.5; rx: 8; }
+    .box-compliance { fill: #D5F5E3; stroke: #27AE60; stroke-width: 1.5; rx: 8; }
+    .box-nexus { fill: #FDEBD0; stroke: #E67E22; stroke-width: 1.5; rx: 8; stroke-dasharray: 6 3; }
+
+    /* Text */
+    .title { font-size: 18px; font-weight: 700; }
+    .class-name { font-size: 12px; font-weight: 600; fill: #2C3E50; }
+    .method-name { font-size: 10px; fill: #566573; font-family: 'SF Mono', 'Consolas', monospace; }
+
+    /* Paths */
+    .path-flow { fill: none; stroke: #BDC3C7; stroke-width: 1.5; stroke-dasharray: 5 3; }
+    .path-nexus { fill: none; stroke: #E67E22; stroke-width: 2; stroke-dasharray: 8 4; }
+    .path-signal { fill: none; stroke: #8E44AD; stroke-width: 2; stroke-dasharray: 4 4; }
+
+    /* Data ball */
+    .ball {
+      fill: #E67E22;
+      filter: url(#glow);
+    }
+
+    /* Labels */
+    .label-bg { fill: #2C3E50; rx: 4; opacity: 0; }
+    .label-text { fill: white; font-size: 9.5px; font-family: 'SF Mono', 'Consolas', monospace; opacity: 0; }
+
+    /* Hop number badges */
+    .hop-badge { fill: #E67E22; }
+    .hop-num { fill: white; font-size: 10px; font-weight: 700; text-anchor: middle; }
+
+    /* Animations - ball position */
+    @keyframes moveBall {
+      0%, 2%     { cx: 160; cy: 135; }    /* Hop 1: at PaymentStarter */
+      5%         { cx: 160; cy: 245; }     /* Arrive PaymentProcessingWorkflow */
+      8%, 14%    { cx: 160; cy: 245; }     /* Pause at workflow */
+
+      15%        { cx: 160; cy: 355; }     /* Hop 2: validatePayment */
+      17%, 23%   { cx: 160; cy: 355; }
+
+      25%        { cx: 550; cy: 355; }     /* Hop 3: cross Nexus boundary */
+      27%        { cx: 780; cy: 355; }     /* Arrive ComplianceNexusServiceImpl (sync) */
+      29%, 35%   { cx: 780; cy: 355; }
+
+      37%        { cx: 550; cy: 465; }     /* Hop 4: cross Nexus boundary (async) */
+      39%        { cx: 780; cy: 465; }     /* Arrive ComplianceNexusServiceImpl (async) */
+      41%, 47%   { cx: 780; cy: 465; }
+
+      49%        { cx: 780; cy: 575; }     /* Hop 5: FraudDetectionWorkflow → Activity → AI */
+      51%, 58%   { cx: 780; cy: 575; }
+
+      60%        { cx: 360; cy: 660; }     /* Hop 6: Signal arrives (purple zone) */
+      62%, 70%   { cx: 160; cy: 680; }     /* Workflow PAUSED → unblocked */
+
+      72%        { cx: 160; cy: 780; }     /* Hop 7: executePayment */
+      74%, 80%   { cx: 160; cy: 780; }
+
+      82%        { cx: 160; cy: 870; }     /* Hop 8: PaymentResult → PaymentStarter */
+      84%, 96%   { cx: 160; cy: 870; }
+
+      100%       { cx: 160; cy: 135; }     /* Reset */
+    }
+
+    /* Label fade-in/out per hop */
+    @keyframes showLabel1 {
+      0%, 2% { opacity: 0; } 3%, 13% { opacity: 1; } 14%, 100% { opacity: 0; }
+    }
+    @keyframes showLabel2 {
+      0%, 15% { opacity: 0; } 16%, 23% { opacity: 1; } 24%, 100% { opacity: 0; }
+    }
+    @keyframes showLabel3 {
+      0%, 27% { opacity: 0; } 28%, 35% { opacity: 1; } 36%, 100% { opacity: 0; }
+    }
+    @keyframes showLabel4 {
+      0%, 39% { opacity: 0; } 40%, 47% { opacity: 1; } 48%, 100% { opacity: 0; }
+    }
+    @keyframes showLabel5 {
+      0%, 49% { opacity: 0; } 50%, 58% { opacity: 1; } 59%, 100% { opacity: 0; }
+    }
+    @keyframes showLabel6 {
+      0%, 62% { opacity: 0; } 63%, 70% { opacity: 1; } 71%, 100% { opacity: 0; }
+    }
+    @keyframes showLabel7 {
+      0%, 72% { opacity: 0; } 73%, 80% { opacity: 1; } 81%, 100% { opacity: 0; }
+    }
+    @keyframes showLabel8 {
+      0%, 82% { opacity: 0; } 83%, 96% { opacity: 1; } 97%, 100% { opacity: 0; }
+    }
+
+    .label1 { animation: showLabel1 30s infinite; }
+    .label2 { animation: showLabel2 30s infinite; }
+    .label3 { animation: showLabel3 30s infinite; }
+    .label4 { animation: showLabel4 30s infinite; }
+    .label5 { animation: showLabel5 30s infinite; }
+    .label6 { animation: showLabel6 30s infinite; }
+    .label7 { animation: showLabel7 30s infinite; }
+    .label8 { animation: showLabel8 30s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { r: 8; opacity: 0.95; }
+      50% { r: 10; opacity: 1; }
+    }
+  </style>
+
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <marker id="arrow-gray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#95A5A6"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#E67E22"/>
+    </marker>
+    <marker id="arrow-purple" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#8E44AD"/>
+    </marker>
+  </defs>
+
+  <!-- Column backgrounds -->
+  <rect class="payments-bg" x="0" y="0" width="500" height="920" rx="0"/>
+  <rect class="compliance-bg" x="600" y="0" width="500" height="920" rx="0"/>
+
+  <!-- Nexus boundary -->
+  <line x1="550" y1="0" x2="550" y2="920" stroke="#E67E22" stroke-width="3" stroke-dasharray="12 6" opacity="0.6"/>
+  <text x="550" y="25" text-anchor="middle" fill="#E67E22" font-size="13" font-weight="700">NEXUS BOUNDARY</text>
+
+  <!-- Column titles -->
+  <text x="250" y="55" text-anchor="middle" class="title" fill="#2980B9">Payments Team</text>
+  <text x="250" y="75" text-anchor="middle" font-size="11" fill="#5DADE2">task queue: payments-processing</text>
+  <text x="850" y="55" text-anchor="middle" class="title" fill="#27AE60">Compliance Team</text>
+  <text x="850" y="75" text-anchor="middle" font-size="11" fill="#58D68D">task queue: compliance-risk</text>
+
+  <!-- PAYMENTS COLUMN BOXES -->
+
+  <!-- PaymentStarter -->
+  <rect class="box-payments" x="60" y="105" width="200" height="50"/>
+  <text x="160" y="127" text-anchor="middle" class="class-name">PaymentStarter</text>
+  <text x="160" y="143" text-anchor="middle" class="method-name">main() starts 5 workflows</text>
+
+  <!-- PaymentProcessingWorkflow -->
+  <rect class="box-payments" x="30" y="210" width="260" height="60"/>
+  <text x="160" y="235" text-anchor="middle" class="class-name">PaymentProcessingWorkflowImpl</text>
+  <text x="160" y="252" text-anchor="middle" class="method-name">processPayment(PaymentRequest)</text>
+
+  <!-- PaymentActivity.validatePayment -->
+  <rect class="box-payments" x="50" y="330" width="220" height="50"/>
+  <text x="160" y="352" text-anchor="middle" class="class-name">PaymentActivity</text>
+  <text x="160" y="367" text-anchor="middle" class="method-name">validatePayment(request) → true</text>
+
+  <!-- Workflow PAUSED (signal wait) -->
+  <rect x="40" y="640" width="240" height="65" fill="#F5EEF8" stroke="#8E44AD" stroke-width="1.5" rx="8" stroke-dasharray="6 3"/>
+  <text x="160" y="663" text-anchor="middle" class="class-name" fill="#8E44AD">Workflow.await(24h)</text>
+  <text x="160" y="680" text-anchor="middle" class="method-name" fill="#8E44AD">PAUSED for approval signal</text>
+  <text x="160" y="696" text-anchor="middle" class="method-name" fill="#27AE60">Signal received → unblocked!</text>
+
+  <!-- PaymentActivity.executePayment -->
+  <rect class="box-payments" x="50" y="755" width="220" height="50"/>
+  <text x="160" y="777" text-anchor="middle" class="class-name">PaymentActivity</text>
+  <text x="160" y="792" text-anchor="middle" class="method-name">executePayment(request)</text>
+
+  <!-- PaymentResult -->
+  <rect class="box-payments" x="40" y="845" width="240" height="50"/>
+  <text x="160" y="867" text-anchor="middle" class="class-name">PaymentResult assembled</text>
+  <text x="160" y="882" text-anchor="middle" class="method-name">→ returned to PaymentStarter</text>
+
+  <!-- COMPLIANCE COLUMN BOXES -->
+
+  <!-- ComplianceNexusServiceImpl (sync) -->
+  <rect class="box-nexus" x="650" y="320" width="260" height="60"/>
+  <text x="780" y="343" text-anchor="middle" class="class-name" fill="#E67E22">ComplianceNexusServiceImpl</text>
+  <text x="780" y="360" text-anchor="middle" class="method-name">categorizeTransaction() [SYNC]</text>
+  <text x="780" y="373" text-anchor="middle" class="method-name">→ TransactionCategorizerAgent</text>
+
+  <!-- ComplianceNexusServiceImpl (async) -->
+  <rect class="box-nexus" x="650" y="435" width="260" height="60"/>
+  <text x="780" y="458" text-anchor="middle" class="class-name" fill="#E67E22">ComplianceNexusServiceImpl</text>
+  <text x="780" y="475" text-anchor="middle" class="method-name">screenTransaction() [ASYNC]</text>
+  <text x="780" y="488" text-anchor="middle" class="method-name">→ spawns FraudDetectionWorkflow</text>
+
+  <!-- FraudDetectionWorkflow + Activity -->
+  <rect class="box-compliance" x="640" y="540" width="280" height="70"/>
+  <text x="780" y="562" text-anchor="middle" class="class-name">FraudDetectionWorkflowImpl</text>
+  <text x="780" y="578" text-anchor="middle" class="method-name">→ FraudDetectionActivity</text>
+  <text x="780" y="594" text-anchor="middle" class="method-name">→ FraudDetectionAgent (AI/LLM)</text>
+
+  <!-- Signal source -->
+  <rect x="640" y="650" width="260" height="45" fill="#F5EEF8" stroke="#8E44AD" stroke-width="1.5" rx="8"/>
+  <text x="770" y="670" text-anchor="middle" class="class-name" fill="#8E44AD">Signal: approveTransaction()</text>
+  <text x="770" y="685" text-anchor="middle" class="method-name" fill="#8E44AD">ApprovalDecision(approved, "Jane")</text>
+
+  <!-- FLOW ARROWS -->
+
+  <!-- Hop 1: Starter → Workflow -->
+  <line x1="160" y1="155" x2="160" y2="208" class="path-flow" marker-end="url(#arrow-gray)"/>
+
+  <!-- Hop 2: Workflow → validatePayment -->
+  <line x1="160" y1="270" x2="160" y2="328" class="path-flow" marker-end="url(#arrow-gray)"/>
+
+  <!-- Hop 3: validatePayment → Nexus SYNC (categorize) -->
+  <line x1="270" y1="355" x2="648" y2="350" class="path-nexus" marker-end="url(#arrow-orange)"/>
+
+  <!-- Hop 4: Workflow → Nexus ASYNC (screen) -->
+  <line x1="270" y1="380" x2="648" y2="465" class="path-nexus" marker-end="url(#arrow-orange)"/>
+
+  <!-- Hop 5: Nexus async → FraudDetectionWorkflow -->
+  <line x1="780" y1="495" x2="780" y2="538" class="path-flow" marker-end="url(#arrow-gray)"/>
+
+  <!-- Hop 6: Signal arrow -->
+  <line x1="640" y1="672" x2="282" y2="672" class="path-signal" marker-end="url(#arrow-purple)"/>
+
+  <!-- Hop 7: Workflow → executePayment -->
+  <line x1="160" y1="705" x2="160" y2="753" class="path-flow" marker-end="url(#arrow-gray)"/>
+
+  <!-- Hop 8: executePayment → PaymentResult -->
+  <line x1="160" y1="805" x2="160" y2="843" class="path-flow" marker-end="url(#arrow-gray)"/>
+
+  <!-- HOP NUMBER BADGES -->
+  <g>
+    <circle class="hop-badge" cx="140" cy="180" r="11"/>
+    <text class="hop-num" x="140" y="184">1</text>
+  </g>
+  <g>
+    <circle class="hop-badge" cx="140" cy="300" r="11"/>
+    <text class="hop-num" x="140" y="304">2</text>
+  </g>
+  <g>
+    <circle class="hop-badge" cx="460" cy="343" r="11"/>
+    <text class="hop-num" x="460" y="347">3</text>
+  </g>
+  <g>
+    <circle class="hop-badge" cx="460" cy="430" r="11"/>
+    <text class="hop-num" x="460" y="434">4</text>
+  </g>
+  <g>
+    <circle class="hop-badge" cx="810" cy="520" r="11"/>
+    <text class="hop-num" x="810" y="524">5</text>
+  </g>
+  <g>
+    <circle class="hop-badge" cx="460" cy="660" r="11" fill="#8E44AD"/>
+    <text class="hop-num" x="460" y="664">6</text>
+  </g>
+  <g>
+    <circle class="hop-badge" cx="140" cy="730" r="11"/>
+    <text class="hop-num" x="140" y="734">7</text>
+  </g>
+  <g>
+    <circle class="hop-badge" cx="140" cy="825" r="11"/>
+    <text class="hop-num" x="140" y="829">8</text>
+  </g>
+
+  <!-- ANIMATED DATA BALL -->
+  <circle class="ball" r="8"
+    style="animation: moveBall 30s infinite ease-in-out, pulse 2s infinite;">
+  </circle>
+
+  <!-- HOP LABELS (fade in/out with ball) -->
+
+  <!-- Label 1 -->
+  <g class="label1">
+    <rect x="190" y="165" width="300" height="20" class="label-bg" style="animation: showLabel1 30s infinite;"/>
+    <text x="195" y="179" class="label-text" style="animation: showLabel1 30s infinite;">PaymentRequest(TXN-002, $49,999, US → Cayman Islands)</text>
+  </g>
+
+  <!-- Label 2 -->
+  <g class="label2">
+    <rect x="200" y="340" width="180" height="20" class="label-bg" style="animation: showLabel2 30s infinite;"/>
+    <text x="205" y="354" class="label-text" style="animation: showLabel2 30s infinite;">validatePayment() → returns true</text>
+  </g>
+
+  <!-- Label 3 -->
+  <g class="label3">
+    <rect x="410" y="300" width="310" height="32" class="label-bg" style="animation: showLabel3 30s infinite;"/>
+    <text x="415" y="314" class="label-text" style="animation: showLabel3 30s infinite;">NEXUS SYNC  CategoryRequest</text>
+    <text x="415" y="326" class="label-text" style="animation: showLabel3 30s infinite;">→ TransactionCategory("INTL_TRANSFER")</text>
+  </g>
+
+  <!-- Label 4 -->
+  <g class="label4">
+    <rect x="410" y="400" width="310" height="32" class="label-bg" style="animation: showLabel4 30s infinite;"/>
+    <text x="415" y="414" class="label-text" style="animation: showLabel4 30s infinite;">NEXUS ASYNC  RiskScreeningRequest</text>
+    <text x="415" y="426" class="label-text" style="animation: showLabel4 30s infinite;">→ spawns FraudDetectionWorkflow</text>
+  </g>
+
+  <!-- Label 5 -->
+  <g class="label5">
+    <rect x="570" y="610" width="340" height="32" class="label-bg" style="animation: showLabel5 30s infinite;"/>
+    <text x="575" y="624" class="label-text" style="animation: showLabel5 30s infinite;">RiskScreeningResult(HIGH, 0.87,</text>
+    <text x="575" y="636" class="label-text" style="animation: showLabel5 30s infinite;">  requiresApproval=true)</text>
+  </g>
+
+  <!-- Label 6 -->
+  <g class="label6">
+    <rect x="320" y="695" width="290" height="20" class="label-bg" style="animation: showLabel6 30s infinite;"/>
+    <text x="325" y="709" class="label-text" style="animation: showLabel6 30s infinite;">ApprovalDecision(approved=true, "Jane")</text>
+  </g>
+
+  <!-- Label 7 -->
+  <g class="label7">
+    <rect x="200" y="775" width="240" height="20" class="label-bg" style="animation: showLabel7 30s infinite;"/>
+    <text x="205" y="789" class="label-text" style="animation: showLabel7 30s infinite;">executePayment() → "CONF-TXN-002-..."</text>
+  </g>
+
+  <!-- Label 8 -->
+  <g class="label8">
+    <rect x="195" y="885" width="330" height="20" class="label-bg" style="animation: showLabel8 30s infinite;"/>
+    <text x="200" y="899" class="label-text" style="animation: showLabel8 30s infinite;">PaymentResult(true, TXN-002, COMPLETED, HIGH, ...)</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(20, 905)">
+    <rect x="0" y="-5" width="1060" height="18" fill="white" opacity="0.7" rx="4"/>
+    <circle cx="15" cy="4" r="5" fill="#2980B9"/> <text x="25" y="8" font-size="9" fill="#566573">Payments Team</text>
+    <circle cx="145" cy="4" r="5" fill="#27AE60"/> <text x="155" y="8" font-size="9" fill="#566573">Compliance Team</text>
+    <circle cx="285" cy="4" r="5" fill="#E67E22"/> <text x="295" y="8" font-size="9" fill="#566573">Nexus call</text>
+    <circle cx="385" cy="4" r="5" fill="#8E44AD"/> <text x="395" y="8" font-size="9" fill="#566573">Signal</text>
+    <circle cx="465" cy="4" r="6" fill="#E67E22" opacity="0.8"/> <text x="477" y="8" font-size="9" fill="#566573">Data ball (watch it move!)</text>
+    <text x="700" y="8" font-size="9" fill="#95A5A6">TXN-002: $49,999 US → Cayman Islands (high-risk path)</text>
+  </g>
+</svg>
