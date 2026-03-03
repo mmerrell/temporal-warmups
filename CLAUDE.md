@@ -80,6 +80,7 @@ Each exercise contains:
 -  interactive .html diagram to visually convey data flows, nexus boundaries, data mutation (similar to exercise-1301)
 - cool and interesting interactive diagrams embedded in the README to help the student learn
 - Step-by-step guidance, acronyms similar to exercise 1300, metaphors, humor
+- Never include time estimates in exercises or READMEs — they are normally wrong and create pressure
 - The poor implementation is located in /exercise folder along with skeleton of Temporal classes. The /solution folder contains the full solution to the exercise.
 - We begin each exercise by executing code and understanding the problem through a running app. Show something running as fast as possible.
 - Every small lesson contains a checkpoint to run code and test new implementation.
